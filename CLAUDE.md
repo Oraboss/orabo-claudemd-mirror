@@ -329,11 +329,51 @@ Before Stripe redirect: `checklist.js` saves `jc_checklist_state` (see shape abo
 ### DOCX-only download
 Buttons say "Download Checklist (Word)" / "Download Report (Word)" — DOCX only, no PDF. `payment-return-*.js` wires download button in capture phase inside `.then()`, calls `e.stopImmediatePropagation()` to block module's html2pdf handler. Uses `atob()` → `Uint8Array` → `Blob` → `URL.createObjectURL` → `<a>` click. Never add PDF — `generatePdf()` produces blank output for HTML input.
 
+### Checklist knowledge base (backend — `utils/checklist-knowledge.js` + `utils/checklist-pathway-data.js`)
+The checklist AI system is driven by two utility modules (neither is a route — they are imported by `routes/checklist.js`):
+
+**`utils/checklist-pathway-data.js`** (442 lines) — pure data; exports `PATHWAY_KNOWLEDGE_BASE`:
+- 13 entries keyed by snake_case pathway key (e.g. `work_visa`, `digital_nomad_visa`)
+- Each entry: `{ display_name, what_it_is, eligibility_gate, core_documents[], destination_variants{}, common_pitfalls[] }`
+- `eligibility_gate` fields timestamped `"Verified 2026-05-14"` against authoritative sources (USCIS, gov.uk, canada.ca, etc.)
+- Destination variant keys use the exact frontend dropdown values (e.g. `'United States'` not `'USA'`, `'United Kingdom'` not `'UK'`)
+- `working_holiday_visa` entry explicitly states no African passport qualifies (all bilateral agreements are with European/South American countries only)
+- `critical_skills_visa` scoped to South Africa (SAQA evaluation required, R1,089 fee) and Ireland (Critical Skills Employment Permit, salary ≥€40,904/year from March 2026) only
+- `investor_business_visa` lists African countries with US E-2 Treaty eligibility: Cameroon, Congo, Egypt, Ethiopia, Liberia, Morocco, Senegal, Togo, Tunisia
+- `digital_nomad_visa` flags no-DNV destinations: USA, Canada, UK, Australia, NZ, Russia, China, Brazil, South Africa, Ireland
+
+**`utils/checklist-knowledge.js`** (437 lines) — logic; exports `CHECKLIST_PROMPT_VERSION`, `INFEASIBLE_COMBINATIONS`, `buildKnowledgeBlock`, `buildInfeasibilityGuardrail`:
+- `CHECKLIST_PROMPT_VERSION = 'v2.0-2026-05-14'` — bump this string whenever knowledge base content changes to invalidate all Supabase cache entries automatically
+- `ORIGIN_AUTHENTICATION_CONTEXT` — 16 entries (15 African countries + DEFAULT):
+  - `hague_apostille_member: true/false/null` — verified against HCCH status table 2026-05-14
+  - Hague **members**: South Africa (1995), Morocco (2016), Senegal (2023), Rwanda (2024)
+  - Hague **non-members**: Nigeria, Ghana, Kenya, Ethiopia, Tanzania, Uganda, Cameroon, Zimbabwe, Zambia, Côte d'Ivoire, Egypt (requires full consular legalisation chain for each destination)
+  - `document_authentication` — complete legalisation chain per origin country
+  - `credential_evaluation_notes` — WES (Canada/USA), NARIC/ENIC (UK), anabin (Germany/France), NOOSR (Australia)
+  - `passport_quirks[]` — TB test requirements (India/Pakistan processing centres), yellow fever certificates, biometric appointment wait times
+  - `common_destinations_quick_notes{}` — keyed by destination country name, e.g. Nigeria→UK: mandatory TB test at approved clinic in Lagos/Abuja
+  - `verified: '2026-05-14'` on every entry
+- `INFEASIBLE_COMBINATIONS` — 6 rules, each with `detect(pathwayKey, dest, origin)` function, `explanation`, `closest_alternative`:
+  1. `working_holiday_visa` + any African passport → alternative: Job Seeker Visa or Skilled Worker Visa
+  2. `us_green_card` + destination ≠ 'United States' → always destination-locked
+  3. `eu_blue_card` + destination not in EU_BLUE_CARD_ELIGIBLE (Denmark and Ireland opted out; EEA-only countries excluded) → alternative: Skilled Worker for that country
+  4. `critical_skills_visa` + destination not South Africa or Ireland → alternative: Skilled Worker for that country
+  5. `digital_nomad_visa` + destination has no DNV programme → alternative: Work Visa for that country
+  6. `investor_business_visa` + USA + African origin not in E-2 treaty list → alternative: EB-5 or O-1 Visa
+- `buildInfeasibilityGuardrail()` — returns static 6-line protocol telling the AI to emit a ⚠ warning header then generate the alternative checklist
+- `buildKnowledgeBlock(pathwayKey, destination, origin)` — builds Block 1 system prompt text: pathway knowledge entry + origin authentication context + 8-rule output format
+
+**Backend routing in `routes/checklist.js`:**
+- `PATHWAY_DISPLAY_TO_KEY` map (13 entries): translates the full option text sent from the frontend (e.g. `'Work Visa (Skilled Worker, H-1B, 482)'`) → internal snake_case key (e.g. `'work_visa'`). Returns 400 if the exact text doesn't match — this guards against stale frontend values.
+- `VALID_DESTINATIONS` Set (28 values): uses full country names matching the frontend dropdown exactly (`'United States'`, `'United Kingdom'` — NOT `'USA'`/`'UK'`). Returns 400 for unrecognised destinations.
+- Infeasible combinations skip both cache read AND cache write — they always generate fresh with the guardrail active in Block 2
+- Cache key format: `checklist:${CHECKLIST_PROMPT_VERSION}:${pathwayKey}:${country}:${countryOfOrigin}` — includes version, pathway, destination, and origin for accurate per-user personalisation. Up to ~5,824 unique cache entries (13 × 28 × 16).
+
 ### Brand sanitisation
 `routes/checklist.js` and `routes/report.js` run `sanitizeBrand()` on every Claude response (cache hits and fresh): replaces "Japa Readiness", "JapaConnect", "japaconnect", "japa connect" with "Orabo"/"Orabo Readiness". Sanitised content is written to `ai_cache`. `routes/checklist.js` also strips markdown code fences from the raw Claude response before `sanitizeBrand()` and before writing to `ai_cache`: `content = content.replace(/^```html\s*/i, '').replace(/```\s*$/i, '')`.
 
 ### Currency personalisation
-`country_of_origin` in request body → backend resolves local currency from `ORIGIN_CURRENCY_MAP` → injects second non-cached system block. First block (knowledge base) is cached with `cache_control: { type: 'ephemeral' }`.
+`country_of_origin` in request body → backend resolves local currency from `ORIGIN_CURRENCY_MAP` → injects second non-cached system block (Block 2). Block 1 (knowledge base + infeasibility guardrail) is cached with `cache_control: { type: 'ephemeral' }`. Infeasible combination details are also injected into Block 2 — never into the cached Block 1.
 
 ### Dynamic scholarship and university generation (report only)
 `routes/report.js` does NOT query `scholarships` or `universities` tables. Claude generates 6–8 scholarships and 6–8 universities from `VISA_KNOWLEDGE_BASE`. `max_tokens` for `/api/report` is 8000.
@@ -410,9 +450,12 @@ Free quiz on `index.html`: country-of-origin validation in `js/free-quiz-origin.
 
 ### Claude API
 - Model: `claude-sonnet-4-6`; all use prompt caching on knowledge base system block
-- `/api/checklist` and `/api/report`: max_tokens 8000; two-block system prompt — first (knowledge base, cached) + second (per-request currency, not cached)
+- `/api/checklist`: max_tokens 8000; two-block system prompt — Block 1 (infeasibility guardrail + pathway knowledge + origin auth context, cached via `cache_control: ephemeral`) + Block 2 (local currency + optional infeasibility marker, not cached); knowledge base in `utils/checklist-knowledge.js` + `utils/checklist-pathway-data.js`; infeasible combinations skip cache entirely; cache key includes `CHECKLIST_PROMPT_VERSION` — bump it in `checklist-knowledge.js` when rules change
+- `/api/report`: max_tokens 8000; two-block system prompt — first (knowledge base, cached) + second (per-request currency, not cached)
 - `/api/cv` and `/api/sop`: max_tokens 6000; two-block system prompt — first cached (gatekeeper persona + universal rules including no-fabrication rule for CV), second uncached per-request (target-country format/SOP rules + SOP track scaffold from `utils/document-norms.js`); no `ai_cache` reads or writes — every submission is generated fresh; no userId required
-- All check `ai_cache` before calling Claude; store sanitised results after
+- `/api/checklist` checks Supabase `ai_cache` before calling Claude (feasible combinations only); stores sanitised results after; infeasible combinations never cached
+- `/api/report` checks `ai_cache`; stores sanitised results after
+- **When changing checklist immigration rules**, bump `CHECKLIST_PROMPT_VERSION` in `utils/checklist-knowledge.js` — this changes all cache keys and forces fresh generations for all combinations
 
 ---
 
@@ -507,6 +550,8 @@ Free quiz on `index.html`: country-of-origin validation in `js/free-quiz-origin.
 - **DOCX-only downloads for checklist/report pages:** capture-phase listener inside `.then()`; `e.stopImmediatePropagation()` blocks html2pdf. Never add PDF — `generatePdf()` produces blank output for HTML.
 - **Brand sanitisation in AI routes:** call `sanitizeBrand()` on every Claude response in `routes/checklist.js` and `routes/report.js` — both cache hits and fresh. Write sanitised content to `ai_cache`.
 - **Dynamic Claude scholarship/university generation:** do NOT add DB queries for scholarships/universities to `routes/report.js` — Claude generates from `VISA_KNOWLEDGE_BASE`
+- **Checklist knowledge base versioning:** when changing any immigration rule in `utils/checklist-pathway-data.js` or `utils/checklist-knowledge.js`, bump `CHECKLIST_PROMPT_VERSION` in `checklist-knowledge.js` (e.g. `'v2.0-2026-05-14'` → `'v2.1-YYYY-MM-DD'`). This changes all Supabase cache keys, forcing fresh AI generations for every combination. Old entries in `ai_cache` become unreachable harmlessly — no cleanup needed.
+- **Checklist infeasible combinations:** detected in `INFEASIBLE_COMBINATIONS` in `utils/checklist-knowledge.js`. Never cache infeasible results — they always generate fresh with the ⚠ guardrail header. Never modify `verifyPayment()` in `utils/verify-payment.js` — it must remain intact before any Claude call. To add a new infeasible combination, add a `{ detect(pathwayKey, dest, origin), explanation, closest_alternative, action }` entry to `INFEASIBLE_COMBINATIONS` and bump `CHECKLIST_PROMPT_VERSION`.
 - **Opportunities submission form:** 8 required fields (`opp-field-error` inline per field): Link, Title, Organization, Country, End Date, Type, Brief Description, Your Email. Country `<select>`: USA, Canada, UK, Australia, New Zealand as flat options + `<optgroup label="Western Europe">` (19 countries). Type options include Undergraduate Scholarship and Scholarship Award. Frontend sends `{ title, organization, country, end_date, type, link, description, email }`; backend maps `organization`→`org`, `end_date`→`deadline`/`expires_at`. Duplicate check: `LOWER(TRIM(link))`; returns `{ error: 'duplicate' }` HTTP 409. `input[type="date"]` styled in `css/opportunities.css` under `.story-modal`; text/select inputs styled via global `.form-group input, .form-group select` in `css/layout.css`.
 - **Community Feed filter dropdown:** The pill-button filter row was replaced with a `<select id="oppFilterSelect" class="opportunity-filter-select">` dropdown in `index.html`. Filter order: All · Undergraduate · Masters · PhD Funding · Fellowship · Scholarship · Research Grant · Postdoc · Jobs · Work Permit. Filter option `value` attributes and their exact type-mappings in `js/opportunities.js` `filterOpportunities()`: `all` → no filter; `undergraduate` → `type === 'Undergraduate Scholarship'` only; `Masters Scholarship` → `type === 'Masters Scholarship'` only (exact via default branch); `PhD Funding` → exact; `Fellowship` → exact; `scholarship` → `type === 'Scholarship Award'` only; `Research Grant` → exact; `Postdoc` → exact; `Job Opportunity` → exact; `Work Permit Program` → exact. The three scholarship-related filters (Undergraduate, Masters, Scholarship) are **mutually exclusive** — each maps to exactly one stored type and never overlaps. Do NOT change `scholarship` to a substring/contains match — that would cause cross-filter contamination. Styles in `css/opportunities.css` (`.opp-filter-row`, `.opportunity-filter-select`). `.filter-btn` styles in `css/cards.css` are retained — they are used by the visa tracker and university finder.
 - **Opportunities publish notification:** `scheduler.js` runs hourly; queries `approved=true AND email_sent=false AND email != ''`; sends Brevo email; sets `email_sent=true`. The `email_sent` column was added via SQL editor — do not include in CREATE TABLE.
