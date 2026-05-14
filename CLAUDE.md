@@ -302,14 +302,26 @@ No userId passed for anonymous flow — backend skips purchases table check when
 
 ## Document Checklist & Readiness Report Architecture
 
+### Wizard pathway and destination selects
+The checklist wizard (all three pages: `index.html`, `doc-checklist.html`, `full-doc-checklist.html`) uses `<select>` dropdowns for pathway (Stage 1) and destination (Stage 2) — **pathway cards and country pills were removed**. New element IDs:
+- `#checklist-pathway-select` — Stage 1 pathway dropdown; 13 pathways (see below); value is a snake_case key (e.g. `work_visa`)
+- `#checklist-destination-select` — Stage 2 destination dropdown; 9 standalone countries (USA, Canada, UK, Australia, NZ, Russia, China, Brazil, South Africa) + `<optgroup label="Western Europe">` with 19 countries matching `#opp_country` in the opportunities form
+- `#pathway-select-error` / `#destination-select-error` — validation error divs (`.visible` class pattern, same as `.country-select-error`)
+
+**wizardNext1 and wizardNext2 are no longer disabled in HTML.** Pathway and destination validation is handled inline inside `checklist.js`'s click handlers: if the select has no value, the appropriate error div gets `.visible` added and the handler returns.
+
+**Pathway select values and counts:** `work_visa` (15), `study` (13), `permanent_residency` (18), `us_green_card` (20), `job_seeker_visa` (11), `eu_blue_card` (14), `family_partner` (13), `critical_skills_visa` (14), `investor_business_visa` (16), `digital_nomad_visa` (11), `global_talent_visa` (16), `self_employment_visa` (12), `working_holiday_visa` (10). The full option text (e.g. "Work Visa (Skilled Worker, H-1B, 482)") is stored as `checklistPathway` and sent to the backend API. The snake_case value is stored as `checklistPathwayKey` for `CHECKLIST_DOC_COUNTS` lookup and cancel-return restoration.
+
+**`jc_checklist_state` shape:** `{ pathway: "<full label>", pathwayKey: "<snake_case>", country: "<country name>" }`. `oraboChecklistRestore(state)` sets `pathwaySel.value = state.pathwayKey` and `destSel.value = state.country`.
+
 ### Country-of-origin selection (mandatory)
-- Checklist: `id="checklist-country-origin"` in `#wizardStage1`, validated before `#wizardNext1`
+- Checklist: `id="checklist-country-origin"` in `#wizardStage1` (only on `doc-checklist.html` and `full-doc-checklist.html` — not on `index.html`). First option is `<option value="" disabled selected>— Select your country —</option>` — no pre-selected country. `jc_checklist_origin` is saved as `sel.value` (empty string if not selected; the 'Nigeria' fallback was removed).
 - Quiz: `id="report-country-origin"` in `#quizQuestionScreen`, validated before `#quizNext`
 
 `checklist-origin-saver.js` and `quiz-origin-saver.js` use capture-phase `addEventListener('click', fn, true)`. If dropdown empty: `e.stopImmediatePropagation()` blocks module handler; `.country-select-error.visible` shows. Do NOT modify `checklist.js` or `quiz.js`.
 
 ### SessionStorage bridge
-Before Stripe redirect: `checklist.js` saves `jc_checklist_state`; `quiz.js` saves `jc_quiz_state`; origin savers save `jc_checklist_origin` / `jc_quiz_origin`. After return, `payment-return-*.js` reads and clears all keys, passes `country_of_origin` in API request body. Both scripts call `fetch()` directly inside `DOMContentLoaded` — no `supabaseClient.auth.getSession()` await before the request (that await was the root cause of the API call never firing). `userId` is read from `state.userId || null`; checklist.js/quiz.js do not currently save userId in state so it passes as null. AbortController timeouts: 100 s for checklist, 180 s for report. Message rotation interval: 8 s for checklist, 15 s for report. Console prefixes: `[checklist-return]` / `[quiz-return]`.
+Before Stripe redirect: `checklist.js` saves `jc_checklist_state` (see shape above); `quiz.js` saves `jc_quiz_state`; origin savers save `jc_checklist_origin` / `jc_quiz_origin`. After return, `payment-return-*.js` reads and clears all keys, passes `country_of_origin` in API request body. Both scripts call `fetch()` directly inside `DOMContentLoaded` — no `supabaseClient.auth.getSession()` await before the request (that await was the root cause of the API call never firing). `userId` is read from `state.userId || null`; checklist.js/quiz.js do not currently save userId in state so it passes as null. AbortController timeouts: 100 s for checklist, 180 s for report. Message rotation interval: 8 s for checklist, 15 s for report. Console prefixes: `[checklist-return]` / `[quiz-return]`.
 
 ### API response format
 `/api/checklist` and `/api/report` return `{ "success": true, "checklist/report": "<html>", "docx": "<base64 string>" }`. `docx` present on both cache hits and fresh generations.
