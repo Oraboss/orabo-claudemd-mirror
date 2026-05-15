@@ -9,7 +9,7 @@ Orabo is a platform empowering Africans with verified pathways to study, work, a
 
 ---
 
-## Current State — Phase 8 + Phase 5A/5B + Phase EB Tier 1 + Phase EB Tier 2 + Phase EB Tier 3 + Phase O-1A + Phase UKGT Tier 1 + Phase UKGT Tier 2 + Phase UKGT Tier 3 + Email Pipeline Hardening + Review Screen Polish + Back Buttons & Cancel Return + Payment Integrity (Live)
+## Current State — Phase 8 + Phase 5A/5B + Phase EB Tier 1 + Phase EB Tier 2 + Phase EB Tier 3 + Phase O-1A + Phase UKGT Tier 1 + Phase UKGT Tier 2 + Phase UKGT Tier 3 + Email Pipeline Hardening + Review Screen Polish + Back Buttons & Cancel Return + Payment Integrity (Live) + Pay Calculator 18 Countries
 
 > **Email pipeline last reviewed: 2026-05-13.** Active `[brevo-<context>]` contexts: `checklist`, `report`, `cv`, `cv-attr`, `sop`, `sop-attr`, `eb1a`, `eb1a-attr`, `eb2`, `eb2-attr`, `eb1a-letter`, `eb1a-letter-attr`, `eb2-letter`, `eb2-letter-attr`, `eb1a-package`, `eb1a-package-attr`, `eb2-package`, `eb2-package-attr`, `o1a`, `o1a-attr`, `o1a-letter`, `o1a-letter-attr`, `o1a-package`, `o1a-package-attr`, `ukgt-tech`, `ukgt-tech-attr`, `ukgt-tech-statement`, `ukgt-tech-statement-attr`, `ukgt-tech-package`, `ukgt-tech-package-attr`, `consultation`, `waitlist-welcome`, `rejection`, `story-approved`, `story-rejected`, `payout`, `opp-ack`, `publish`.
 
@@ -243,7 +243,7 @@ Grouped `<select>` dropdown. Data in `CITIES[]` and `COST_DATA{}` (monthly USD: 
 Countries: USA (5), Canada (4), UK (4), Ireland (2), Netherlands (2), Germany (3), Portugal (2), Australia (3), New Zealand (2), Nigeria (2), Kenya (1), Ghana (1), South Africa (2).
 
 ### Take-Home Pay Calculator (`js/paycalc.js` + `js/paycalc-data.js`) — 35 roles × 9 countries
-`js/paycalc-data.js` exports `ROLES[]`, `ROLE_GROUPS`, `SALARY_DATA{}`. Countries: USA, Canada, UK, Germany, Netherlands, Ireland, Australia, New Zealand, Portugal. Sectors: Technology (9), Healthcare (6), Education (3), Business & Finance (8), Engineering (4), Trades (5).
+`js/paycalc-data.js` exports `ROLES[]`, `ROLE_GROUPS`, `SALARY_DATA{}`. 18 countries across 3 groups: **Original Destinations** (USA, Canada, UK, Germany, Netherlands, Ireland, Australia, New Zealand, Portugal), **New Destinations** (UAE, France, Sweden, Switzerland, Spain), **African Origin** (Nigeria, Kenya, Ghana, South Africa — lets users see their current salary alongside destination salary). Sectors: Technology (9), Healthcare (6), Education (3), Business & Finance (8), Engineering (4), Trades (5). FX_RATES in `paycalc.js` extended with AED (3.67 fixed peg), SEK (10.30), CHF (0.88) — calculator-internal display only, not in user-facing currency dropdown. Country `<select>` restructured with `<optgroup>` sections via `buildCountryOptions()` in `paycalc.js`; `all-countries-pay.html` picks up all 18 countries automatically from its local `COUNTRY_DATA` object.
 
 `all-countries-pay.html` imports from `./js/paycalc-data.js` via `<script type="module">`. `COUNTRY_DATA` holds 9 countries with `costOfLiving` values aligned to `paycalc.js`'s `COL_MONTHLY_USD`. All event wiring via `addEventListener`.
 
@@ -487,7 +487,7 @@ Free quiz on `index.html`: country-of-origin validation in `js/free-quiz-origin.
 - On `signup.html`, `login.html`, and `dashboard.html` — always use `supabaseClient` (not `supabase`); `const supabase` conflicts with the UMD global `var supabase` and crashes silently
 - City/role selection UIs use grouped `<select>` dropdowns (not pill buttons); extend existing data arrays — do not revert to pills
 - **Cost of Living comparison city selection:** uses `compareSlots[]` state (not `compareCities`). `buildCityOptions(selectedId)` generates grouped options. Slots 2–4 progressive; slot 0 permanent. Do NOT revert to pills.
-- **paycalc-data.js pattern:** `ROLES[]`, `ROLE_GROUPS`, `SALARY_DATA{}` in `js/paycalc-data.js` only. Never re-declare in `paycalc.js` or `all-countries-pay.html`. Adding a role: add to all three exports with data for all 9 countries.
+- **paycalc-data.js pattern:** `ROLES[]`, `ROLE_GROUPS`, `SALARY_DATA{}` in `js/paycalc-data.js` only. Never re-declare in `paycalc.js` or `all-countries-pay.html`. Adding a role: add to all three exports with data for all 18 countries. Adding a country: add a `SALARY_DATA` key for all 35 roles, a `COUNTRIES` entry in `paycalc.js` (with `fxRate`, `taxRate`, `cityId`), a `COL_MONTHLY_USD` entry in `paycalc.js`, a `COUNTRY_DATA` entry in `all-countries-pay.html`, and add its ID to the correct `COUNTRY_GROUPS` array in `paycalc.js`.
 - **all-countries-pay.html module script:** tool logic in `<script type="module">`; Pro gate in separate non-module `<script>` before it. Module does NOT duplicate Pro check — `return` at module top level is a SyntaxError.
 - Follow existing BEM-like CSS class naming conventions
 - No TypeScript — plain JavaScript only
