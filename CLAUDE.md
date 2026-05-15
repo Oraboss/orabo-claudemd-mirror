@@ -497,6 +497,7 @@ Free quiz on `index.html`: country-of-origin validation in `js/free-quiz-origin.
 - Follow existing BEM-like CSS class naming conventions
 - No TypeScript — plain JavaScript only
 - Do not add comments unless logic is non-obvious
+- Every public-facing HTML page must include a complete Open Graph block (`og:title`, `og:description`, `og:url`, `og:image` with `og:image:secure_url`, `og:image:type`, `og:image:width=1200`, `og:image:height=630`, `og:image:alt`) referencing `https://orabo.app/og-image.jpg`, plus `twitter:card=summary_large_image` and `twitter:image`. Reference implementation: `uk-global-talent.html`.
 - Mobile-first responsive design — check existing `@media` breakpoints before adding new ones
 - Use existing CSS variables (`--navy`, `--accent`, `--gold`, etc.) — do not introduce new colour values
 - **When adding a new database table:** provide `CREATE TABLE` SQL for Supabase SQL editor BEFORE pushing dependent code
