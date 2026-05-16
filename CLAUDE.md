@@ -223,7 +223,8 @@ japaconnect-backend/
 │   ├── visas.js         # CRUD + pagination → Orabo Main
 │   ├── opportunities.js # Community submissions → Orabo Main; duplicate check by normalized link (409 { error:'duplicate' } if found)
 │   ├── ukgt-tech.js     # UKGT Tech Nation AI route — mounted at /api/ukgt-tech → Orabo Prod; imports prompts from ukgt-tech-prompts.js
-│   └── ukgt-tech-prompts.js  # Extracted system prompts — exports UKGT_TECH_SYSTEM_PROMPT (Tier 1) and UKGT_TECH_STATEMENT_SYSTEM_PROMPT (Tier 2) via module.exports (no DB)
+│   ├── ukgt-tech-prompts.js  # Extracted system prompts — exports UKGT_TECH_SYSTEM_PROMPT (Tier 1) and UKGT_TECH_STATEMENT_SYSTEM_PROMPT (Tier 2) via module.exports (no DB)
+│   └── dashboard.js     # Dashboard read APIs (state/recent-purchases/matched-opportunities) → Orabo Prod + Orabo Main; feature-flagged behind DASHBOARD_V2_ENABLED
 ├── utils/
 │   └── constants.js     # ORIGIN_CURRENCY_MAP — 16 African countries mapped to local currency string (e.g. 'NGN (₦)')
 └── scrapers/            # Cheerio/Playwright scrapers
@@ -448,7 +449,7 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 - **Standalone page return URLs:** `readiness_report` → `readiness-report.html?payment_success=1&item=readiness_report`; `document_checklist` → `doc-checklist.html?payment_success=1&item=document_checklist`; `full_doc_checklist` → `full-doc-checklist.html?payment_success=1&item=full_doc_checklist`. Handled by `payment-return-*.js`, not `stripe.js`.
 - Webhook events: `checkout.session.completed`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`, `charge.refunded`
 - `pro_expires_at` from Stripe's actual `current_period_end` — never hardcode duration
-- Required Railway env vars: `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `AI_ROUTES_REQUIRE_STRIPE_SESSION`
+- Required Railway env vars: `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `AI_ROUTES_REQUIRE_STRIPE_SESSION`, `DASHBOARD_V2_ENABLED`
 
 ### Brevo
 - Weekly digest: Saturday 08:00 UTC (`digest.js` → `scheduler.js`)
@@ -526,6 +527,7 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 - **RLS is enabled on all user-data tables.** Anon key has: read-only access to `opportunities WHERE approved = true` and `stories WHERE approved = true`; no access to anything else via direct Supabase REST. User JWT has read/write access only to their own row in `user_profiles` and read-only access to their own `purchases` rows. All other writes (one_off_purchases, post_earn_rewards, ai_cache, processed_webhook_events, opportunities, stories) go through the Express backend with the service role key, which bypasses RLS. Never add a new user-data table without also adding RLS policies in the same migration. Policy SQL canonical reference: `migrations/2026-05-13-rls-pass-2.sql` (backend repo).
 - **Stripe subscription checkout:** never pass `priceId` from frontend — backend reads `process.env.STRIPE_PRO_PRICE_ID`; frontend sends `{ userId, email, mode: 'subscription' }`
 - **Dashboard plan state:** always route changes through `updateDashboardForPlan(plan)` — never scatter plan-state updates elsewhere
+- **`DASHBOARD_V2_ENABLED` env var** gates all `/api/dashboard/*` routes. When false or unset, every dashboard read route returns 404. Used as a kill switch during the dashboard rebuild phases. Flag is removed in Phase 7 once the rebuild is sealed.
 - **CSP inline styles:** `style-src` has no `'unsafe-inline'` — never use `style="display:none"` on elements that need to start hidden; use CSS rules instead (tool modals hidden via `css/cvtool.css`)
 - **CSP inline scripts:** `script-src` has no `'unsafe-inline'` — never use `onclick=""` attributes; always wire via `addEventListener` in module init IIFEs
 - **New tool modal pattern:** follow cvtool/soptool pattern — CSS `.active` class for visibility (never `style="display:..."`), `showModal()` adds `.active` to modal wrapper, `showScreen(id)` toggles `.active` on child screens, sessionStorage bridge, two-part URL condition (`payment_success=1` + sessionStorage key) in `init()`
