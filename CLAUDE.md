@@ -410,7 +410,7 @@ Free quiz on `index.html`: country-of-origin validation in `js/free-quiz-origin.
 - Email verification redirect: `https://orabo.app/login.html?verified=true`
 - Password reset redirect: `https://orabo.app/login.html`
 - Database tables: `user_profiles`, `purchases`, `universities`, `scholarships`, `visas`, `opportunities`, `scrape_logs`, `ai_cache`, `one_off_purchases`, `post_earn_rewards`
-- `user_profiles` columns: `id`, `pro_status`, `pro_expires_at`, `stripe_customer_id`, `stripe_subscription_id`
+- `user_profiles` columns: `id`, `pro_status`, `pro_expires_at`, `stripe_customer_id`, `stripe_subscription_id`, `quiz_results` (jsonb), `user_preferences` (jsonb), `journey_state` (jsonb). JSONB columns added 2026-05-16 in Phase 1 of dashboard rebuild — see backend repo `migrations/2026-05-16-dashboard-rebuild-p1.sql`.
 - `one_off_purchases` columns: `id` (uuid pk), `name` (text), `email` (text), `tool` (text), `stripe_session_id` (text, nullable), `created_at` (timestamptz) — audit log for anonymous CV/SOP purchases
 - `opportunities` extra columns added by migration: `status` (text, default 'pending'), `submitter_phone` (text), `rejection_reason` (text)
 - `post_earn_rewards` columns: `id` (uuid pk), `email` (text unique), `phone` (text), `name` (text), `approved_count` (int, default 0), `total_paid` (int, default 0), `reward_paid` (bool, default false), `reward_paid_at` (timestamptz), `created_at`, `updated_at` — upserted on each opportunity approval; counter resets to 0 after each payout
