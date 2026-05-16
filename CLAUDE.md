@@ -211,19 +211,19 @@ japaconnect-backend/
 ├── digest.js            # Weekly newsletter via Brevo
 ├── db/client.js         # pg Pool
 ├── routes/
-│   ├── admin.js         # Admin CRUD routes — all protected by requireAdmin (x-admin-token header); manages opportunities, stories, scholarships, universities, post_earn_rewards, users, purchases
-│   ├── stripe.js        # Checkout, portal session, webhooks
-│   ├── checklist.js     # AI document checklist (Claude + ai_cache); returns { checklist, docx }
-│   ├── report.js        # AI readiness report (Claude + ai_cache); returns { report, docx }; sets res.setTimeout(180000) + req.setTimeout(180000) at route top
-│   ├── cv.js            # CV Review + Cover Letter — AI generation + PDF/DOCX via docgen.js
-│   ├── sop.js           # SOP Writer — AI generation + PDF/DOCX via docgen.js
-│   ├── docgen.js        # generatePdf() + generateDocx() — both handle HTML and markdown input via isHtml() check
-│   ├── universities.js  # CRUD + pagination (DB table exists but report.js no longer queries it)
-│   ├── scholarships.js  # CRUD + pagination (DB table exists but report.js no longer queries it)
-│   ├── visas.js         # CRUD + pagination
-│   ├── opportunities.js # Community submissions — requires type, link, description, email; duplicate check by normalized link (409 { error:'duplicate' } if found)
-│   ├── ukgt-tech.js     # UKGT Tech Nation AI route — mounted at /api/ukgt-tech; branches on outputType: ukgt_tech_assessment (Tier 1, markdown) and ukgt_tech_statement (Tier 2, HTML); imports prompts from ukgt-tech-prompts.js
-│   └── ukgt-tech-prompts.js  # Extracted system prompts — exports UKGT_TECH_SYSTEM_PROMPT (Tier 1) and UKGT_TECH_STATEMENT_SYSTEM_PROMPT (Tier 2) via module.exports; extracted to keep ukgt-tech.js under 600 lines
+│   ├── admin.js         # Admin CRUD routes — protected by requireAdmin (x-admin-token header); uses pool (Orabo Main) for content CRUD + Supabase JS client (Orabo Prod) for user management
+│   ├── stripe.js        # Checkout, portal session, webhooks → Orabo Prod
+│   ├── checklist.js     # AI document checklist (Claude + ai_cache) → Orabo Prod
+│   ├── report.js        # AI readiness report (Claude + ai_cache) → Orabo Prod; sets res.setTimeout(180000) + req.setTimeout(180000) at route top
+│   ├── cv.js            # CV Review + Cover Letter — AI generation + PDF/DOCX via docgen.js → Orabo Prod
+│   ├── sop.js           # SOP Writer — AI generation + PDF/DOCX via docgen.js → Orabo Prod
+│   ├── docgen.js        # generatePdf() + generateDocx() — both handle HTML and markdown input via isHtml() check (no DB)
+│   ├── universities.js  # CRUD + pagination → Orabo Main
+│   ├── scholarships.js  # CRUD + pagination → Orabo Main
+│   ├── visas.js         # CRUD + pagination → Orabo Main
+│   ├── opportunities.js # Community submissions → Orabo Main; duplicate check by normalized link (409 { error:'duplicate' } if found)
+│   ├── ukgt-tech.js     # UKGT Tech Nation AI route — mounted at /api/ukgt-tech → Orabo Prod; imports prompts from ukgt-tech-prompts.js
+│   └── ukgt-tech-prompts.js  # Extracted system prompts — exports UKGT_TECH_SYSTEM_PROMPT (Tier 1) and UKGT_TECH_STATEMENT_SYSTEM_PROMPT (Tier 2) via module.exports (no DB)
 ├── utils/
 │   └── constants.js     # ORIGIN_CURRENCY_MAP — 16 African countries mapped to local currency string (e.g. 'NGN (₦)')
 └── scrapers/            # Cheerio/Playwright scrapers
@@ -405,15 +405,37 @@ Free quiz on `index.html`: country-of-origin validation in `js/free-quiz-origin.
 
 ## Integrations
 
-### Supabase
-- Auth (email/password)
-- Email verification redirect: `https://orabo.app/login.html?verified=true`
-- Password reset redirect: `https://orabo.app/login.html`
-- Database tables: `user_profiles`, `purchases`, `universities`, `scholarships`, `visas`, `opportunities`, `scrape_logs`, `ai_cache`, `one_off_purchases`, `post_earn_rewards`
+### Supabase — Dual-DB Architecture
+
+Orabo runs on two Supabase projects under the Oraboss organisation, deliberately split by role.
+
+#### 1. Orabo Prod (operational / transactional)
+- **Host:** `rrkkbnoqubfmhrnxgngp.supabase.co`
+- **Region:** us-west-2 (West US Oregon)
+- **Backend env vars:** `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+- **Backend client:** Supabase JS client (`createClient`) instantiated inline in each route that needs it — `routes/admin.js`, `routes/checklist.js`, `routes/cv.js`, `routes/sop.js`, `routes/eb1a.js`, `routes/eb2.js`, `routes/o1a.js`, `routes/report.js`, `routes/stripe.js`, `routes/ukgt-tech.js`, `utils/verify-payment.js`
+- **Tables:** `user_profiles`, `purchases`, `one_off_purchases`, `ai_cache`, `processed_webhook_events`
+- **Holds:** user accounts, payments, AI cache, webhook idempotency ledger
+- Auth lives here (email/password). Email verification redirect: `https://orabo.app/login.html?verified=true`. Password reset redirect: `https://orabo.app/login.html`.
 - `user_profiles` columns: `id`, `pro_status`, `pro_expires_at`, `stripe_customer_id`, `stripe_subscription_id`, `quiz_results` (jsonb), `user_preferences` (jsonb), `journey_state` (jsonb). JSONB columns added 2026-05-16 in Phase 1 of dashboard rebuild — see backend repo `migrations/2026-05-16-dashboard-rebuild-p1.sql`.
 - `one_off_purchases` columns: `id` (uuid pk), `name` (text), `email` (text), `tool` (text), `stripe_session_id` (text, nullable), `created_at` (timestamptz) — audit log for anonymous CV/SOP purchases
+
+#### 2. Orabo Main (content / CMS / analytics)
+- **Host:** `fcogjoxcfmrcuvtreivm.supabase.co`
+- **Region:** us-east-1 (East US Virginia)
+- **Backend env vars:** `DB_HOST` + `DB_PORT` + `DB_NAME` + `DB_USER` + `DB_PASSWORD` (direct PostgreSQL connection to Supabase's managed Postgres; `DB_HOST` is `db.fcogjoxcfmrcuvtreivm.supabase.co`)
+- **Backend client:** raw `pg.Pool` instantiated in `db/client.js`; imported as `pool` by all content routes
+- **Tables:** `opportunities`, `scholarships`, `universities`, `visas`, `stories`, `visits`, `scrape_logs`, `post_earn_rewards`, `visa_processing_snapshots`
+- **Holds:** scraper-fed content powering public listing pages (University Finder, Scholarships & Funding, Visa Tracker), community-submitted opportunities, visitor analytics, post-and-earn reward ledger
+- Routes that hit this DB: `routes/opportunities.js`, `routes/scholarships.js`, `routes/universities.js`, `routes/visas.js`, `routes/stories.js`, `routes/visits.js`, `routes/visa-tracker.js`. `routes/admin.js` hits **both** DBs — uses `pool` for content CRUD and the Supabase JS client for user management.
 - `opportunities` extra columns added by migration: `status` (text, default 'pending'), `submitter_phone` (text), `rejection_reason` (text)
 - `post_earn_rewards` columns: `id` (uuid pk), `email` (text unique), `phone` (text), `name` (text), `approved_count` (int, default 0), `total_paid` (int, default 0), `reward_paid` (bool, default false), `reward_paid_at` (timestamptz), `created_at`, `updated_at` — upserted on each opportunity approval; counter resets to 0 after each payout
+
+#### Cross-cutting rules
+- Never mix clients in a single route (except `admin.js` which intentionally spans both). If a new route needs data from both DBs, fetch from each then combine in memory — do not attempt a cross-DB JOIN.
+- New tables go where their role belongs: user/auth/payment/AI-state → Orabo Prod; content/CMS/scraper output/analytics → Orabo Main.
+- Migrations target one project at a time. Always confirm the project ref in the Supabase URL bar matches the intended target before running any ALTER TABLE, DROP, or destructive SQL.
+- Both projects are on Supabase Pro with daily automated physical backups. No manual download is required before migrations.
 
 ### Stripe
 - Pro subscription price ID: `price_1TO3hu2Nqh05kvDpKAmtEYjs` — stored in `STRIPE_PRO_PRICE_ID` Railway env var; backend reads `process.env.STRIPE_PRO_PRICE_ID` — never from frontend request body
@@ -600,6 +622,7 @@ Free quiz on `index.html`: country-of-origin validation in `js/free-quiz-origin.
 - **Payment verification on AI routes:** All 7 AI generation routes call `verifyPayment()` from `utils/verify-payment.js` before invoking Claude. Recipients for Brevo delivery are derived from the trusted source (Stripe session `customer_email`, or Supabase auth lookup via `userId`), never from `formAnswers.user_email`. Kill switch is `AI_ROUTES_REQUIRE_STRIPE_SESSION` on Railway. Frontend tool modules must forward `stripe_session_id` from URL params in the POST body — never omit. Any new AI-generation route added in the future (additional visa suites, etc.) MUST call `verifyPayment()` before any Claude API call.
 - **Visa Eligibility tool back/next buttons:** `js/eligibility.js` follows the same `.tool-back-btn` / `.tool-next-btn` pattern as CV/SOP/EB/O-1A tools — back button rendered on Q2–Q10 only (Q1 has only the X close), wired via `addEventListener`, label `← Back`. Next button is the standard accent-blue pill from `css/cvtool.css`. Final question's Next label is `See my matches →`. Progress counter reads from `questions.length` — never hardcoded. A `#eligibilityResultsBack` `.tool-back-btn` is also injected as the first child of the results screen by `renderResults()` — clicking it hides results, re-renders Q10 with the saved answer preserved, and does NOT modify the localStorage free-use counter (`usesIncrementedThisSession` flag guards against double-increment on back+resubmit; "Check Again" resets the flag for a genuine new attempt). Mirrors the `#quizResultsBack` pattern in `js/quiz.js`.
 - **Visa Eligibility upgrade modal z-index:** the upgrade modal must stack ABOVE the eligibility results modal — its z-index (10010) is set above the `.quiz-overlay` z-index (10000) in `css/subscription.css`. Do not close the eligibility results when opening the upgrade modal — keep both stacked so the user can return to their matches after the upgrade flow.
+- **Dual-DB architecture:** Operational/transactional data (users, payments, auth, AI cache, audit logs) lives in Orabo Prod (`rrkkbnoqubfmhrnxgngp.supabase.co`, us-west-2), accessed via the Supabase JS client (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`). Content/CMS data (universities, scholarships, opportunities, visas, stories, visits) lives in Orabo Main (`fcogjoxcfmrcuvtreivm.supabase.co`, us-east-1), accessed via the raw `pg.Pool` in `db/client.js` (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`). When adding a new table, decide which role it serves and place it in the correct project. Never JOIN across DBs — fetch from each and combine in memory. When running migrations, always verify the project ref in the Supabase URL bar before clicking Run.
 
 ---
 
