@@ -55,7 +55,7 @@ The frontend is a **multi-page app** with 12 core app HTML files + 6 EB tool pag
 | `index.html` | Main marketing site — free tools + marketing cards for paid services (CV/SOP/Consult Start buttons redirect to standalone tool pages) | No |
 | `signup.html` | Sign-up page | No |
 | `login.html` | Login + forgot-password page | No |
-| `dashboard.html` | Personal dashboard — sidebar tool launcher (17 tools across Free / Pro / Coming Soon tiers) + right-pane iframe tool content. Pro upgrade entry point. CV Review, SOP Writer, and Consultation are NOT here — they live on standalone pages (cv-tool.html, sop-tool.html, consult-booking.html). | Yes — redirects to `login.html` if unauthenticated |
+| `dashboard.html` | Personal dashboard — sidebar tool launcher (15 entries: 1 journey home + 8 free + 6 Pro) + right-pane iframe tool content. Pro upgrade entry point. CV Review, SOP Writer, and Consultation are NOT here — they live on standalone pages (cv-tool.html, sop-tool.html, consult-booking.html). The three former Coming Soon placeholders (Budget Tracker, Progress Tracking, Priority Support) were removed on 2026-05-16 — the journey home now surfaces the personalisation those entries were intended to represent. | Yes — redirects to `login.html` if unauthenticated |
 | `cv-tool.html` | Standalone CV Review tool — public, auto-opens CV modal on load | No — open to all; name + email captured in form (section 1) |
 | `sop-tool.html` | Standalone SOP Writer tool — public, auto-opens SOP modal on load | No — open to all; name + email captured in form (section 1) |
 | `consult-booking.html` | Standalone Consultation booking — public, auto-opens booking modal on load | No — open to all; name + email captured in booking form |
@@ -101,7 +101,7 @@ japaconnect/
 ├── index.html               # Main marketing site (public, free tools + marketing cards; paid tool buttons navigate to cv-tool.html / sop-tool.html / consult-booking.html)
 ├── signup.html              # Sign-up page (standalone, own inline script)
 ├── login.html               # Login + forgot-password page (standalone, own inline script)
-├── dashboard.html           # Protected dashboard — sidebar tool launcher (17 tools) + right-pane iframe tool content + Pro upgrade entry point. CV / SOP / Consultation NOT here; they live on cv-tool.html / sop-tool.html / consult-booking.html. All logic is a single inline <script> — no external module imports.
+├── dashboard.html           # Protected dashboard — sidebar tool launcher (15 entries: 1 journey home + 8 free + 6 Pro) + right-pane iframe tool content + Pro upgrade entry point. CV / SOP / Consultation NOT here; they live on cv-tool.html / sop-tool.html / consult-booking.html. All logic is a single inline <script> — no external module imports.
 ├── cv-tool.html             # Standalone CV tool — public; DOMContentLoaded inline script auto-opens modal; Stripe returns here; no auth
 ├── sop-tool.html            # Standalone SOP tool — public; DOMContentLoaded inline script auto-opens modal; Stripe returns here; no auth
 ├── consult-booking.html     # Standalone consultation — public; DOMContentLoaded auto-clicks .consult-btn; stripe.js shows calendlyOverlay on return; no auth
