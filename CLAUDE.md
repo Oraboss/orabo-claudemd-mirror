@@ -558,7 +558,7 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 - Pure HTML/CSS/JS for the frontend — no framework
 - Keep global styles in `styles.css`; feature-specific styles in `css/<feature>.css`
 - Feature JS for `index.html` goes in `js/<feature>.js` (ES modules with `import/export`)
-- `signup.html`, `login.html`, and `dashboard.html` use inline `<script>` blocks — do not add module imports to them
+- `signup.html`, `login.html`, and `dashboard.html` use external non-module script files (`js/signup.js`, `js/login.js`, `js/dashboard-inline.js`) — these were extracted from inline blocks on 2026-05-18 to comply with the Cloudflare Pages edge CSP (`script-src` has no `'unsafe-inline'`). Do not convert these to ES modules and do not re-inline them.
 - On `signup.html`, `login.html`, and `dashboard.html` — always use `supabaseClient` (not `supabase`); `const supabase` conflicts with the UMD global `var supabase` and crashes silently
 - City/role selection UIs use grouped `<select>` dropdowns (not pill buttons); extend existing data arrays — do not revert to pills
 - **Cost of Living comparison city selection:** uses `compareSlots[]` state (not `compareCities`). `buildCityOptions(selectedId)` generates grouped options. Slots 2–4 progressive; slot 0 permanent. Do NOT revert to pills.
