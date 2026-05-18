@@ -553,6 +553,8 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 ## Coding Rules
 
 - Always commit and push to `origin main` after every code change — no need to ask
+- **Pro price is $12/mo** — never advertise any other price for the Pro subscription on any surface (marketing pages, button labels, error recovery text, FAQ, email templates, etc.)
+- **Document Checklist and Readiness Report outputs are DOCX-only** — never advertise "PDF" for these tools in marketing copy, buttons, emails, or FAQ. `generatePdf()` produces blank output for HTML input; this is a known, intentional constraint that is not changing.
 - Pure HTML/CSS/JS for the frontend — no framework
 - Keep global styles in `styles.css`; feature-specific styles in `css/<feature>.css`
 - Feature JS for `index.html` goes in `js/<feature>.js` (ES modules with `import/export`)
