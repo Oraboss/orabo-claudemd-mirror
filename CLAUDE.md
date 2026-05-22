@@ -747,3 +747,30 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 - **Backend:** https://github.com/Oraboss/japaconnect-backend — deployed on Railway
 - **Branch (both):** main
 - **Git user:** Abiodun Bello
+
+---
+
+## Pending / Parked Items
+
+Priority tiers: **Blocking** → **High** → **Medium** → **Low**
+
+### High — verification owed (code shipped, not yet confirmed live)
+
+- **Live $19 Pathway Match production smoke** (scheduled 2026-05-22) — full funnel gate: real card → Stripe `cs_live_` session → `one_off_purchases` row written with non-null `stripe_session_id` → 7-section report renders in DOCX → Brevo delivery email arrives. ~$0.56 non-refundable Stripe fees (canonical smoke cost). Do not mark Pathway Match Phase C complete until this passes.
+- **`eb-immigration.html` live verification** (`bc6b634` shipped 2026-05-21) — confirm on live page after Cloudflare deploy: zero `Refused to execute inline script` in DevTools console; `js/eb-immigration.js` returns 200/304; bad email → red outline + no POST; good email → POST to `/api/newsletter/subscribe {email, source:'eb_waitlist'}` fires for **both** forms (`eb-email` and `eb-email-2`). Root cause: waitlist was silently dead 2026-05-18 → 2026-05-21 because the inline IIFE was blocked by Cloudflare edge CSP.
+
+### High — sitewide silent-CSP audit (new, flagged 2026-05-21)
+
+- The 2026-05-18 inline-script-extraction pass **missed `eb-immigration.html`**, leaving its waitlist dead for 3 days. Other pages from that pass may have been missed too. **Action:** static scan of every HTML file for inline `<script>` blocks with bodies (no `src` attribute) that the Cloudflare edge `script-src 'self'` CSP (no `unsafe-inline`) would block. Prioritise lead-capture surfaces: SEO landing pages (`readiness-score.html`, `visa-eligibility.html`, `document-checklist.html`, `eb-immigration.html`), marketing pages (`o1a-visa.html`, `uk-global-talent.html`), and blog articles. Failure mode is invisible to users (form appears to succeed, no POST fires), so this requires a deliberate audit — not incidental discovery.
+- **Standing check to adopt:** any page with a form or interactive JS gets a one-time DevTools console pass for `Refused to execute inline script` before it is considered shipped.
+
+### Medium — footer template a11y (sitewide)
+
+- `buildFooter()` / shared footer has two a11y issues capping Lighthouse Accessibility at ~93 across SEO pages, `pathway-compare.html`, and all pages using the footer:
+  1. **`color-contrast`** — `--text-muted` footer greys (`#b07f2e` / `#6f7c91` / `#637188`) on `--navy-dark` (`#0f2548`) fail the 4.5:1 WCAG AA ratio. Fix: introduce a footer-context token, e.g. `.footer-text-muted { color: rgba(255,255,255,0.6) }`, without touching the global `--text-muted` variable used elsewhere.
+  2. **`heading-order`** — footer `<h5>` column headings follow `<h1>`→`<h3>` page headings, skipping H4. Fix: replace footer column headings with `<p class="footer-col-heading">` or a styled `<div>` (not a heading element).
+  - After fixing `buildFooter()`, regenerate the SEO comparison batch (`node scripts/generate-compare-seo.mjs`). Target: Accessibility ≥ 95.
+
+### Low — follow-up (flagged, not a regression)
+
+- **`js/eb-immigration.js` `.catch` swallows endpoint errors** — the catch handler currently shows the success message ("You're on the list!") even when the backend returns an error or the network is down, silently losing the lead. Pre-existing behaviour preserved verbatim during the 2026-05-21 CSP fix. Address only if Railway logs show recurring `/api/newsletter/subscribe` errors; when fixing, give the `.catch` branch a real inline error state (e.g. "Something went wrong — try again").
