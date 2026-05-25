@@ -274,7 +274,7 @@ japaconnect/
 japaconnect-backend/
 ├── server.js            # Express app, route mounts
 ├── scheduler.js         # node-cron jobs with retry logic; includes hourly publish-notification cron (sends Brevo email when approved=true AND email_sent=false)
-├── digest.js            # Weekly newsletter via Brevo
+├── digest.js            # Weekly newsletter via Brevo — sendDigest({force,test}) idempotent, never throws; called by scheduler.js (fallback) and POST /api/internal/run-digest (primary external trigger)
 ├── db/client.js         # pg Pool
 ├── routes/
 │   ├── admin.js         # Admin CRUD routes — protected by requireAdmin (x-admin-token header); uses pool (Orabo Main) for content CRUD + Supabase JS client (Orabo Prod) for user management
@@ -293,11 +293,15 @@ japaconnect-backend/
 │   ├── dashboard.js     # Dashboard APIs → Orabo Prod + Orabo Main; feature-flagged behind DASHBOARD_V2_ENABLED. Routes: GET /state, GET /recent-purchases, GET /matched-opportunities, POST /preferences (Phase 5). POST /preferences validates ALLOWED_DESTINATIONS/PATHWAYS/FIELDS, writes user_profiles.user_preferences, fires Brevo sync (DESTINATION, PREF_PATHWAY, PREF_FIELD)
 │   ├── quiz.js          # POST /api/quiz/save-results → Orabo Prod (user_profiles.quiz_results). JWT-gated via resolveAuthUser, feature-flagged via DASHBOARD_V2_ENABLED, rate-limited 10/min per IP. Dashboard Rebuild Phase 3.
 │   ├── audit.js         # Petition Audit — mounted at /api/audit with express.json({limit:'8mb'}) before global parser; dispatches by family ('o1a', 'eb1a', 'eb2' live; 'ukgt' future); verifyPayment gate; runAudit({family,text}) exported for offline calibration; 9-section HTML output → code-fence strip → generateDocx; NO ai_cache; AUDIT_HTML_DISCLAIMERS map (keyed by family) appended to every output
-│   └── audit-prompts.js # Adversarial dual-persona prompts keyed by family — USCIS Adjudicating Officer (RFE-writing) + Senior Reviewing Immigration Attorney (remediation); officer calibration is the primary tuning risk
+│   ├── audit-prompts.js # Adversarial dual-persona prompts keyed by family — USCIS Adjudicating Officer (RFE-writing) + Senior Reviewing Immigration Attorney (remediation); officer calibration is the primary tuning risk
+│   └── internal.js      # POST /api/internal/run-digest — protected by x-digest-secret header; calls sendDigest({force,test}); returns result JSON; never referenced in frontend
 ├── utils/
 │   ├── brevo-email.js   # Shared Brevo transactional email helper — exports sendTransactionalEmail({ to, subject, htmlContent }) + sendAdminNotification({ subject, htmlContent, context }). sendAdminNotification sends to ADMIN_NOTIFY_EMAIL env var; fail-open (skips silently if unset, logs error without throwing on network failure). Requires ADMIN_NOTIFY_EMAIL on Railway.
 │   ├── constants.js     # ORIGIN_CURRENCY_MAP — 16 African countries mapped to local currency string (e.g. 'NGN (₦)')
 │   └── document-ingest.js  # parseUploadedDocument (mammoth=DOCX, pdf-parse v2=PDF — pinned pdf-parse@^2.4.5, v2 uses new PDFParse({data}).getText() class API; paste=text), sanitizeForPrompt (strips <uploaded_petition> delimiter tags before prompt injection, case-insensitive), IngestError, MAX_WORDS=25000. New backend deps: mammoth, pdf-parse@^2.4.5.
+├── .github/
+│   └── workflows/
+│       └── weekly-digest.yml  # GitHub Actions cron — Saturday 08:00 UTC + workflow_dispatch; curls POST /api/internal/run-digest with x-digest-secret; --fail causes CI red on non-2xx
 └── scrapers/            # Cheerio/Playwright scrapers
 ```
 
@@ -525,14 +529,16 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 - Required Railway env vars: `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `AI_ROUTES_REQUIRE_STRIPE_SESSION`, `DASHBOARD_V2_ENABLED`
 
 ### Brevo
-- Weekly digest: Saturday 08:00 UTC (`digest.js` → `scheduler.js`)
+- Weekly digest: Saturday 08:00 UTC — triggered externally by GitHub Actions cron (`.github/workflows/weekly-digest.yml` in backend repo) via `POST /api/internal/run-digest`. In-process `node-cron` in `scheduler.js` is retained as a redundant fallback (safe because `sendDigest` is idempotent). Root cause of never-delivered digest: Railway restarts/deploys reset in-process node-cron; the external GitHub Actions trigger survives restarts.
 - Subscribe: `POST /api/newsletter/subscribe` — accepts `email` (required), `destination` (optional), `name`, `source`, `quiz_score`, `quiz_date`. Only adds to list when `destination` provided. When `quiz_score` present, sets `QUIZ_SCORE`, `QUIZ_DATE`, `QUIZ_LEAD='true'` on contact. Callers without `destination` (EB waitlist, quiz capture) now succeed.
 - Frontend: `js/newsletter.js` — `subscribeToDigest()` + `waitlistDigestHook()`
 - Transactional emails: consultation confirmation (via `routes/stripe.js`); checklist/report delivery fire-and-forget after generation + cache hits; CV/SOP delivery fire-and-forget from `routes/cv.js` and `routes/sop.js` — email includes specific output type label + upsell paragraph (CV→SOP Writer for `cv_review`/`cover_letter_only`; SOP→Consultation for all SOP types)
 - CV/SOP purchase attribute update (fire-and-forget): after each delivery, `PURCHASE_DATE` (ISO date) + `LAST_TOOL` (outputType) set on the Brevo contact via `POST /v3/contacts` with `updateEnabled: true`
 - `userId` passed in request body from `supabaseClient.auth.getSession()` for checklist/report; CV/SOP use `user_email` from formAnswers (no auth required)
 - Required Brevo custom attributes (create in dashboard if not present): `DESTINATION` (text), `QUIZ_SCORE` (number), `QUIZ_DATE` (text), `QUIZ_LEAD` (text), `PURCHASE_DATE` (date), `LAST_TOOL` (text), `LAST_PREVIEW_TOOL` (text), `LAST_PREVIEW_DATE` (date), `WORTHIT_TARGET` (text), `WORTHIT_VERDICT` (text)
-- Env vars: `BREVO_API_KEY`, `BREVO_LIST_ID`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `ADMIN_NOTIFY_EMAIL` (admin notification recipient — required for `[brevo-admin-*]` contexts; omitting it causes silent skip, never a 500)
+- `sendDigest({ force, test })` in `digest.js`: callable, never throws to caller, idempotent (checks Brevo campaign history for last 6 days — any status except `draft` counts; if found and `force` not set, skips with `already-sent-this-week`). `test=true` creates a draft named `"Orabo Weekly Digest [TEST]"` (distinct suffix so it never blocks the real send) without calling `sendNow`. `force=true` bypasses the idempotency check (for manual re-sends and testing).
+- `POST /api/internal/run-digest` — protected by `x-digest-secret` header (Railway env `DIGEST_TRIGGER_SECRET`); supports `?force=true` and `?test=true` query params; returns result JSON; **never referenced in the frontend**.
+- Env vars: `BREVO_API_KEY`, `BREVO_LIST_ID`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `ADMIN_NOTIFY_EMAIL`, `DIGEST_TRIGGER_SECRET` (Railway env var + GitHub repo secret, same value — required for the external trigger) (admin notification recipient — required for `[brevo-admin-*]` contexts; omitting it causes silent skip, never a 500)
 - **Email template logo:** all Brevo templates reference `https://orabo.app/orabo-icon-256x256.png` as a hotlinked PNG (`width="80" height="80"` required for Outlook). Never use `orabo-icon.svg` in email HTML — SVGs do not render in Outlook or many other clients. Inline styles are permitted in email HTML — the CSP rule applies to the web app only.
 
 ### Calendly
