@@ -634,7 +634,24 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 - Every public-facing HTML page must include a complete Open Graph block (`og:title`, `og:description`, `og:url`, `og:image` with `og:image:secure_url`, `og:image:type`, `og:image:width=1200`, `og:image:height=630`, `og:image:alt`) referencing `https://orabo.app/og-image.jpg`, plus `twitter:card=summary_large_image` and `twitter:image`. Reference implementation: `uk-global-talent.html`.
 - Mobile-first responsive design — check existing `@media` breakpoints before adding new ones
 - Use existing CSS variables (`--navy`, `--accent`, `--gold`, etc.) — do not introduce new colour values
-- **When adding a new database table:** provide `CREATE TABLE` SQL for Supabase SQL editor BEFORE pushing dependent code
+- **When adding a new database table (effective immediately, enforced by Supabase from 2026-10-30):** provide `CREATE TABLE` SQL for Supabase SQL editor BEFORE pushing dependent code. The SQL MUST include explicit GRANT statements — Supabase's Data API change (Oct 30, 2026) stops auto-granting public schema access to service_role, authenticated, and anon. New tables without grants are invisible to supabase-js, PostgREST, and GraphQL. Template:
+  ```sql
+  CREATE TABLE public.new_table (...);
+
+  -- REQUIRED: backend always needs service_role for OPS writes
+  GRANT SELECT, INSERT, UPDATE, DELETE ON public.new_table TO service_role;
+
+  -- ONLY if frontend reads via supabase-js with user JWT:
+  GRANT SELECT ON public.new_table TO authenticated;
+  -- (add INSERT/UPDATE only if user JWT writes directly — rare; most writes go through Express backend)
+
+  -- ONLY if publicly readable (e.g. opportunities WHERE approved=true pattern):
+  GRANT SELECT ON public.new_table TO anon;
+
+  ALTER TABLE public.new_table ENABLE ROW LEVEL SECURITY;
+  -- + RLS policies per Pass 2 reference (migrations/2026-05-13-rls-pass-2.sql)
+  ```
+  Grant minimally. Do NOT grant authenticated or anon access to OPS tables (ai_cache, processed_webhook_events, one_off_purchases, etc.) — those are backend-only. This rule applies to the OPS DB (rrkkbnoqubfmhrnxgngp). It does NOT apply to CONTENT DB (fcogjoxcfmrcuvtreivm) writes via raw pg.Pool — direct Postgres connections bypass the Data API entirely.
 - **RLS is enabled on all user-data tables.** Anon key has: read-only access to `opportunities WHERE approved = true` and `stories WHERE approved = true`; no access to anything else via direct Supabase REST. User JWT has read/write access only to their own row in `user_profiles` and read-only access to their own `purchases` rows. All other writes (one_off_purchases, post_earn_rewards, ai_cache, processed_webhook_events, opportunities, stories) go through the Express backend with the service role key, which bypasses RLS. Never add a new user-data table without also adding RLS policies in the same migration. Policy SQL canonical reference: `migrations/2026-05-13-rls-pass-2.sql` (backend repo).
 - **Stripe subscription checkout:** never pass `priceId` from frontend — backend reads `process.env.STRIPE_PRO_PRICE_ID`; frontend sends `{ userId, email, mode: 'subscription' }`
 - **Dashboard plan state:** always route changes through `updateDashboardForPlan(plan)` — never scatter plan-state updates elsewhere
