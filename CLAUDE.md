@@ -538,6 +538,21 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 - Webhook events: `checkout.session.completed`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`, `charge.refunded`
 - `pro_expires_at` from Stripe's actual `current_period_end` — never hardcode duration
 - Required Railway env vars: `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `AI_ROUTES_REQUIRE_STRIPE_SESSION`, `DASHBOARD_V2_ENABLED`
+- **Rate limit and reward env vars (optional — all have safe code defaults):**
+
+| Var | Default | Used by |
+|-----|---------|---------|
+| `OPP_RATE_LIMIT_MAX` | `5` | `routes/opportunities.js` — max submissions per IP per window |
+| `OPP_RATE_LIMIT_WINDOW_MIN` | `10` | `routes/opportunities.js` — rate-limit window in minutes |
+| `POST_EARN_PAYOUT` | `6000` | `routes/admin.js` — payout amount (NGN) at threshold |
+| `POST_EARN_REWARD_PER_POST` | `300` | `routes/admin.js` — reward per approved post (NGN) |
+| `POST_EARN_THRESHOLD` | `20` | `routes/admin.js` — approvals needed before payout |
+| `PREVIEW_RATE_LIMIT_MAX` | `3` | `routes/preview.js` — max free previews per IP per window |
+| `PREVIEW_RATE_LIMIT_WINDOW_HOURS` | `24` | `routes/preview.js` — preview rate-limit window in hours |
+| `WORTHIT_RATE_LIMIT_MAX` | `5` | `routes/migration-worth-it.js` — max worth-it calls per IP per window |
+| `WORTHIT_RATE_LIMIT_WINDOW_HOURS` | `24` | `routes/migration-worth-it.js` — worth-it window in hours |
+
+All use `parseInt(process.env.VAR) || <default>` — omitting them from Railway is safe.
 
 ### Brevo
 - Weekly digest: Saturday 08:00 UTC — triggered externally by GitHub Actions cron (`.github/workflows/weekly-digest.yml` in backend repo) via `POST /api/internal/run-digest`. In-process `node-cron` in `scheduler.js` is retained as a redundant fallback (safe because `sendDigest` is idempotent). Root cause of never-delivered digest: Railway restarts/deploys reset in-process node-cron; the external GitHub Actions trigger survives restarts.
@@ -673,7 +688,7 @@ Orabo runs on two Supabase projects under the Oraboss organisation, deliberately
 - **Stripe redirects in iframes:** `purchaseItem` and `subscribeToPro` in `stripe.js` use `(window !== window.top ? window.top : window).location.href` — preserve this
 - **Pro upgrade from embedded pages:** post `'initiate-pro-upgrade'` to `window.top` — never call Stripe directly from an iframe. Applies to `compare-cities.html`, `all-countries-pay.html`, `wireUpgradeModal` in `stripe.js`, `eligibility.js`.
 - **Upgrade button label:** always "Upgrade to Pro" — never "Unlock with Pro" or other variants
-- **Backend CORS:** `server.js` uses explicit `ALLOWED_ORIGINS` array (`https://orabo.app`, `https://www.orabo.app`) — do not revert to `FRONTEND_URL` env var
+- **Backend CORS:** `server.js` hardcodes an `ALLOWED_ORIGINS` array (`https://orabo.app`, `https://www.orabo.app`) in the cors() config — no `FRONTEND_URL` env var exists or is needed. See `server.js` cors() config.
 - **Consultation booking flow:** `#bookingModal` and `#calendlyOverlay` in `consult-booking.html`. Modal is 2 steps only — never re-add date/time picker. `_showCalendlyOverlay(url)` in `stripe.js` shows correct event link.
 - **booking.js guard pattern:** wraps all code in IIFE with `if (!modal) return` — safe to import on any page without `#bookingModal`
 - **booking.js back buttons:** step 1 gets a `.tool-back-btn` "← Back to Home" inserted programmatically at the top of `#step1`; step 2's existing `.prev-step` button is removed and replaced with a `.tool-back-btn` "← Back" → `goToStep(1)`. Both wired via `addEventListener` inside the IIFE — never `onclick=""`.
