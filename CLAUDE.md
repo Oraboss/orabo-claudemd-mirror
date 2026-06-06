@@ -628,8 +628,8 @@ Priority tiers: **Blocking** → **High** → **Medium** → **Low**
 - **Live $19 Pathway Match production smoke** — real card → `cs_live_` session → `one_off_purchases` row with non-null `stripe_session_id` → 7-section DOCX → Brevo delivery. Do not mark Pathway Match Phase C complete until this passes.
 - **`eb-immigration.html` live verification** — hero shows two CTA buttons (EB-1A $39 + EB-2 NIW $35), no email field; footer waitlist POSTs `{email, source:'eb_waitlist'}`; zero `Refused to execute inline script` in console.
 
-### High — sitewide silent-CSP audit
-- Static scan of every HTML file for inline `<script>` blocks with bodies (no `src`) that the edge `script-src 'self'` CSP would block. Prioritise lead-capture surfaces (SEO landings, marketing pages, blog). Failure is invisible to users — deliberate audit, not incidental discovery. Standing check: any page with a form/interactive JS gets a one-time DevTools console pass for `Refused to execute inline script` before it is considered shipped.
+### CLOSED 2026-06-06 — sitewide silent-CSP audit
+- **CLOSED 2026-06-06.** Full static scan of all 88 HTML files found zero inline `<script>` bodies and zero inline event handlers; commit 8612349 (compare-cities + all-countries-pay) was the last instance. Report: `audit/sitewide-csp-audit-2026-06-06.md`. Standing check remains in force: any new page with a form/interactive JS gets a one-time DevTools console pass for `Refused to execute inline script` before it is considered shipped.
 
 ### Medium — footer template a11y
 - `buildFooter()` / shared footer has two a11y issues capping Lighthouse Accessibility at ~93: (1) `color-contrast` — `--text-muted` greys on `--navy-dark` fail 4.5:1 (fix with a footer-context token like `.footer-text-muted { color: rgba(255,255,255,0.6) }`); (2) `heading-order` — footer `<h5>` after `<h1>`→`<h3>` skips H4 (replace with `<p class="footer-col-heading">`). After fixing, regenerate the SEO batch (`node scripts/generate-compare-seo.mjs`). Target ≥95.
