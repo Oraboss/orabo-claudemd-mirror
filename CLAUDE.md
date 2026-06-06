@@ -647,4 +647,20 @@ Priority tiers: **Blocking** → **High** → **Medium** → **Low**
 
 ---
 
+## CLAUDE.md Hygiene
+
+CLAUDE.md describes how to work in this repo today — current architecture, operational directives, integration specifics. It is not a changelog.
+
+**Ship-time rule:** every CC prompt that ships a feature must update CLAUDE.md by extracting operational directives into the relevant existing section (Coding Rules, Integrations, route specs, frontend/backend structure, etc.). Do NOT add a "Phase X" entry, dated narrative, "shipped on YYYY-MM-DD" parenthetical, or chronicle prose. If the work supersedes an existing directive, replace the directive in place — do not append a newer version alongside the old one. If you need to record what shipped and when, append a row to `/audit/changelog.md` instead.
+
+**What belongs in CLAUDE.md:** env var names, file paths, function signatures, Stripe item keys, ID prefixes, max_tokens values, timeouts, CSS class names, version strings, API response shapes, console log prefixes, sessionStorage keys, route mount paths, pricing values, Stripe price IDs, architectural patterns, integration specifics, coding rules.
+
+**What does NOT belong in CLAUDE.md:** "Phase N (description):" bullets, "(YYYY-MM-DD)" date parentheticals on directive bullets, test-completion narrative ("validated end-to-end with real $X purchase"), bug-incident references ("fixes timeout seen at HH:MM"), shipped-on-date logs of any kind.
+
+**Quarterly audit:** on Sept 6, Dec 6, Mar 6, June 6 — verify no chronicle has accumulated, confirm mirror sync, spot-check directives against current production. If ship-time discipline holds, the audit is a 30-minute check, not a rewrite. If it has grown by more than 20k chars since the prior audit, the ship-time rule is being violated — find which prompts produced chronicle entries and tighten the prompt template.
+
+**Mirror sync verification after every CLAUDE.md push:** wait ~90s, then `curl -s "https://raw.githubusercontent.com/Oraboss/orabo-claudemd-mirror/main/CLAUDE.md" | grep "<unique phrase from the change>"`. Green GitHub Action ≠ confirmed sync.
+
+---
+
 Historical context archived at /audit/CLAUDE-history-2026-06-06.md
