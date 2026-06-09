@@ -627,9 +627,13 @@ Priority tiers: **Blocking** → **High** → **Medium** → **Low**
 ### High — verification owed (code shipped, not confirmed live)
 - **Live $19 Pathway Match production smoke** — real card → `cs_live_` session → `one_off_purchases` row with non-null `stripe_session_id` → 7-section DOCX → Brevo delivery. Do not mark Pathway Match Phase C complete until this passes.
 - **`eb-immigration.html` live verification** — hero shows two CTA buttons (EB-1A $39 + EB-2 NIW $35), no email field; footer waitlist POSTs `{email, source:'eb_waitlist'}`; zero `Refused to execute inline script` in console.
+- **Pass 7 — RLS verification (from Pass 6 F6.5.1):** confirm `relrowsecurity = true` and add policies/migration for `analytics_events`, `one_off_purchases`, `post_earn_rewards`, `visits` (Orabo Prod / Orabo Main as applicable). Live RLS state was unverifiable during Pass 6.
 
 ### CLOSED 2026-06-06 — sitewide silent-CSP audit
 - **CLOSED 2026-06-06.** Full static scan of all 88 HTML files found zero inline `<script>` bodies and zero inline event handlers; commit 8612349 (compare-cities + all-countries-pay) was the last instance. Report: `audit/sitewide-csp-audit-2026-06-06.md`. Standing check remains in force: any new page with a form/interactive JS gets a one-time DevTools console pass for `Refused to execute inline script` before it is considered shipped.
+
+### CLOSED 2026-06-09 — Pass 6 Privacy/PII audit
+- Pass 6 Privacy/PII audit CLOSED 2026-06-09: 12 findings (0C/0H/8M/4L), 6 fixed, 6 deferred. Audit doc: `audit/Orabo_Pass_6_Audit.docx` (backend repo). Backend commits 6b701a5 (admin.js log maskEmail), a5f173d (Stripe metadata allowlist), e005403 (visits.js CF-IPCountry, drop ipapi.co), 218d0d7 (track.js meta allowlist), 259e2d1 (admin-notify subject PII); frontend c555ddc (draft TTL 30d→7d). Deferred: F6.5.1 → Pass 7 RLS; F6.10.1/2/4 + F6.10.3 → feature tickets below.
 
 ### Medium — footer template a11y
 - `buildFooter()` / shared footer has two a11y issues capping Lighthouse Accessibility at ~93: (1) `color-contrast` — `--text-muted` greys on `--navy-dark` fail 4.5:1 (fix with a footer-context token like `.footer-text-muted { color: rgba(255,255,255,0.6) }`); (2) `heading-order` — footer `<h5>` after `<h1>`→`<h3>` skips H4 (replace with `<p class="footer-col-heading">`). After fixing, regenerate the SEO batch (`node scripts/generate-compare-seo.mjs`). Target ≥95.
@@ -644,6 +648,8 @@ Priority tiers: **Blocking** → **High** → **Medium** → **Low**
 - **CSP `style=""` violations on landings:** `eb-immigration.html` (34) remaining after pass 1 of 2. Dedicated CSP cleanup pass owed (pass 2 after soak).
 - **`js/eb-immigration.js` `.catch` swallows endpoint errors** — shows success message even on error/network-down. Address only if Railway logs show recurring `/api/newsletter/subscribe` errors; give the `.catch` a real inline error state.
 - **Post-signup Pro upgrade breadcrumb (PLANTED, NOT HARVESTED):** `sessionStorage.orabo_post_signup_action = 'pro_upgrade'` set by `js/autoopen-visa-eligibility.js`. Add the reader in (1) `signup.html` post-email-confirmation flow and (2) `dashboard.html` `initDashboard()` (Free plan → `initiateStripeCheckout()` + clear the key). Separate scoped commit.
+- **Privacy policy + consent (from Pass 6 F6.10.1/2/4):** `privacy.html` omits **Anthropic/Claude** (where the most sensitive PII goes), and omits GA4 + ipapi (if reinstated). The cookie clause claims "no tracking cookies" while GA4 (`js/analytics.js`, `G-W5GY92ZHYS`) loads sitewide — a factual contradiction. Add the missing processors, correct the cookie clause, and add a cookie-consent banner. Prince approves copy.
+- **Data-subject-rights endpoints (from Pass 6 F6.10.3):** `privacy.html` promises 30-day account-data deletion but there is no delete-account or export-my-data endpoint/UI (manual email only). Build delete + export endpoints + a dashboard control.
 
 ---
 
