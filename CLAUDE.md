@@ -666,6 +666,8 @@ CLAUDE.md describes how to work in this repo today — current architecture, ope
 
 **Mirror sync verification after every CLAUDE.md push:** wait ~90s, then `curl -s "https://raw.githubusercontent.com/Oraboss/orabo-claudemd-mirror/main/CLAUDE.md" | grep "<unique phrase from the change>"`. Green GitHub Action ≠ confirmed sync.
 
+**Post-compaction probe update (mandatory in the same commit as any compaction):** Compaction removes chronicle content, which silently invalidates any session-start probe strings that referenced that content — producing false "mirror stale" alarms. After removing chronicle content, update the mirror-sync verification probes to strings that (a) exist in the post-compaction file, (b) describe durable features unlikely to be removed by future compactions, and (c) are specific enough that a partial tail-truncation would not accidentally match. Current probes: `"RFE Response Copilot"`, `"Save & Resume"`, `"Pass 7"`. Replace these in the same commit that removes the content they referenced.
+
 ---
 
 Historical context archived at /audit/CLAUDE-history-2026-06-06.md
