@@ -59,6 +59,8 @@ Live product surface:
 | `doc-checklist.html` | Dashboard iframe: document checklist wizard (free preview) | No (self-gates) |
 | `readiness-report.html` | Dashboard iframe: readiness quiz | No (self-gates) |
 | `full-doc-checklist.html` | Dashboard iframe: document checklist (Pro card) | No (self-gates) |
+| `migration-timeline.html` | SEO landing — indexable; drives to /dashboard | No |
+| `timeline-tool.html` | Dashboard iframe: Migration Timeline Planner — Pro-gated via `proGate()`; auto-opened by `js/autoopen-timeline.js` (`type=module`); no Stripe; follows `doc-checklist.html` pattern | No (Pro localStorage gate) |
 | `why-trust-orabo.html` | Public methodology/trust page; indexable; WebPage JSON-LD | No |
 | `readiness-score.html` | SEO landing — drives to `/#readiness` | No |
 | `visa-eligibility.html` | SEO landing + in-place eligibility wizard. Two `.open-eligibility-cta` call `window.openEligibilityModal()`. `#eligibilityOverlay` + `#upgradeModalOverlay` markup duplicated from `index.html`. | No |
@@ -85,7 +87,7 @@ Live product surface:
 | `admin.html` | Admin panel — not linked publicly; direct URL only; loads `css/admin.css` + `js/admin.js` | Admin (Bearer JWT + `user_profiles.role='admin'`) |
 | `blog/index.html` + 6 articles | Blog | No |
 
-`index.html` is always logged-out — no auth in navbar. Standalone tool pages (`cv-tool.html`, `sop-tool.html`, `consult-booking.html`) have no navbar/footer and require no auth — they auto-open the tool modal via an external boot script. Name and email captured as the first form section. `compare-cities.html` / `all-countries-pay.html` gate via `localStorage.getItem('orabo_pro_status') === 'true'`; hide header with `?embed=true`. `doc-checklist.html`, `readiness-report.html`, `full-doc-checklist.html` are standalone embedded pages — import tool module + `autoopen-*.js`; Stripe redirects use `window.top.location.href`.
+`index.html` is always logged-out — no auth in navbar. Standalone tool pages (`cv-tool.html`, `sop-tool.html`, `consult-booking.html`) have no navbar/footer and require no auth — they auto-open the tool modal via an external boot script. Name and email captured as the first form section. `compare-cities.html` / `all-countries-pay.html` gate via `localStorage.getItem('orabo_pro_status') === 'true'`; hide header with `?embed=true`. `doc-checklist.html`, `readiness-report.html`, `full-doc-checklist.html`, `timeline-tool.html` are standalone embedded pages — import tool module + `autoopen-*.js`; Stripe redirects use `window.top.location.href`. `timeline-tool.html` has no Stripe; its `autoopen-timeline.js` loads as `type=module` (same as `autoopen-checklist.js`) for correct deferred-execution sequencing after `timeline.js`.
 
 ---
 
@@ -106,7 +108,9 @@ japaconnect/
 ├── doc-checklist.html       # Dashboard iframe: checklist.js + autoopen-checklist.js
 ├── readiness-report.html    # Dashboard iframe: quiz.js + autoopen-quiz.js
 ├── full-doc-checklist.html  # Dashboard iframe: Pro doc checklist
-├── styles.css               # Global styles (imports all css/ partials)
+├── migration-timeline.html  # SEO landing; indexable; no auth; drives to /dashboard
+├── timeline-tool.html       # Dashboard iframe: Migration Timeline Planner (Pro); autoopen-timeline.js type=module; css/timeline.css loaded here directly (NOT from styles.css)
+├── styles.css               # Global styles (imports all css/ partials except timeline.css)
 ├── script.js                # Legacy interactivity (pre-module)
 ├── site.webmanifest         # PWA manifest
 ├── sw.js / js/register-sw.js # Service worker permanently removed — stub comment files; not loaded
@@ -186,7 +190,7 @@ japaconnect/
 │   ├── dashboard-journey.js / dashboard-inline.js  # Dashboard logic
 │   ├── config.js            # API_URL export
 │   └── utils.js             # escapeHTML and shared helpers
-├── pathway-compare.html / readiness-score.html / visa-eligibility.html / document-checklist.html / eb-immigration.html
+├── pathway-compare.html / readiness-score.html / visa-eligibility.html / document-checklist.html / eb-immigration.html / migration-timeline.html
 ├── blog/  (index.html + 6 articles; load ../styles.css)
 └── CLAUDE.md
 ```
@@ -598,7 +602,7 @@ EmailJS fully removed — do NOT add any new EmailJS calls anywhere. Use Brevo f
 - **Mobile overflow fixes (`css/mobile.css`):** loaded last in `styles.css`; all rules inside `@media (max-width:768px)`. Owns `html, body { overflow-x: hidden }`, hero fixes, text scaling, grids. Do NOT touch other CSS files for mobile overflow.
 - **Service worker:** permanently removed — `sw.js` + `js/register-sw.js` are stub comment files; tag absent from `index.html`. Do not re-add.
 - **PWA icons:** `icons/icon-192.png` + `icons/icon-512.png` are binary copies of `orabo-icon-256x256.png` / `orabo-icon-512x512.png`. Replace both whenever the source logo changes. `site.webmanifest` references these paths.
-- **SEO landing pages (`readiness-score.html`, `visa-eligibility.html`, `document-checklist.html`, `eb-immigration.html`):** minimal nav, no footer, load `styles.css` only, page layout in inline `<style>` in `<head>`. Use `.lp-nav`, `.lp-hero`, `.lp-section`, `.lp-cta-band`, `.lp-footer`. CTAs link to app sections. **CSP applies equally** — no inline `<script>` blocks. Interactive JS must be external (`eb-immigration.html` uses `js/eb-immigration.js`).
+- **SEO landing pages (`readiness-score.html`, `visa-eligibility.html`, `document-checklist.html`, `eb-immigration.html`, `migration-timeline.html`):** minimal nav, no footer, load `styles.css` only, page layout in inline `<style>` in `<head>`. Use `.lp-nav`, `.lp-hero`, `.lp-section`, `.lp-cta-band`, `.lp-footer`. CTAs link to app sections. **CSP applies equally** — no inline `<script>` blocks. Interactive JS must be external (`eb-immigration.html` uses `js/eb-immigration.js`).
 - **Blog articles (`blog/*.html`):** load `../styles.css`; use `.article-body`, `.callout`, `.data-table`, `.cta-block`, `.blog-nav`. Back link → `/blog/`. Target 900–1,200 words. End with a `.cta-block` linking to the relevant tool. Add a `.blog-card` to `blog/index.html` + a `.blog-teaser-card` to the homepage teaser whenever a new article ships.
 - **Admin panel (`admin.html`):** direct URL only. Does NOT load Supabase UMD or `styles.css`. Auth via **Bearer JWT + `user_profiles.role='admin'`** (`requireAdmin`). All admin API routes under `/api/admin/`. `css/admin.css` NOT in `styles.css`. `js/admin.js` is a non-module IIFE.
 - **Admin opportunity approval:** sets BOTH `approved = TRUE` AND `status = 'approved'`. Does NOT send the "post is live" email (scheduler handles it). Upserts `post_earn_rewards` (approved_count +1, phone from submitter_phone).
