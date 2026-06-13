@@ -414,6 +414,24 @@ Free quiz on `index.html`: validation in `js/free-quiz-origin.js`. `generateDocx
 - CSP allowlist additions in `_headers`: `script-src https://eu-assets.i.posthog.com`, `connect-src https://eu.i.posthog.com`.
 - Out of scope: session replay, user identification linkage to Supabase auth, backend webhook → PostHog events.
 
+### PostHog dashboard — "Orabo Production — Funnel & Health" (built 2026-06-13)
+
+Pinned dashboard at https://eu.posthog.com/project/201304/dashboard/746213 (id 746213). Six insights covering top-of-funnel health, geographic distribution, engagement quality, and full conversion funnel. Dashboard is version-controllable via PostHog MCP — re-create with insight-create + dashboard-create calls if ever lost.
+
+Insights and what they measure:
+- `DuwLspai` — Total pageviews (7d). BoldNumber on $pageview, last 7 days. Headline traffic metric.
+- `05zIHWi7` — Daily pageviews (30d). Line graph on $pageview. Spot trends, post-deploy shifts.
+- `4wHJtAZx` — Pageviews by country (30d). Bar chart on $pageview broken down by $geoip_country_name. Top 15. Validates African-first thesis is bearing out in actual user origin. Uses PostHog's server-side IP→country lookup (no PII stored — ip:false config preserved).
+- `x95EfpUH` — Scroll depth distribution (30d). Bar chart on scroll_depth broken down by depth_percent. Engagement quality signal — if 75%/100% milestones are sparse, homepage is too long.
+- `16GzXehS` — Tool engagement by tool name (30d). Bar chart on tool_started broken down by tool_name. Shows which free tools drive most activity (24 tool keys total per analytics.js TOOL_MODAL_MAP).
+- `NYDVpYKJ` — Conversion funnel: hero CTA → tool started → checkout initiated → checkout succeeded. Funnel query, 7-day conversion window, ordered. Headline business metric — drop-off between steps shows where users are lost.
+
+Known coverage gap (Phase A.6 follow-up):
+- `checkout_abandoned` is wired in `js/stripe.js` `checkPaymentReturn` IIFE, which only runs on pages loading stripe.js directly. The 4 iframe-based payment-return paths use `payment-return-checklist.js`, `payment-return-readiness.js`, `payment-return-full-doc.js`, `payment-return-consult.js` instead — these need their own `window.oraboTrack('checkout_abandoned', { item_key })` insertions. Until A.6 ships, the conversion funnel under-counts abandonment for document_checklist, readiness_report, full_doc_checklist, and consult_booking item_keys.
+
+Adding new events:
+Whenever a new event is added to client-side JS (analytics.js, stripe.js, or any new module), the corresponding insight must be added to dashboard 746213. Update this block with the new insight short_id, name, and what it measures so this section stays the authoritative inventory of what PostHog tracks.
+
 ### Calendly
 - Account: `calendly.com/oraboapp`. Express (30 min): `/oraboapp/30min`. Full (1 hr): `/oraboapp/full-consultation`. Doc Review (45 min): `/oraboapp/document-review`.
 - Flow: pay → `consult-booking.html?payment_success=1&item=consultation_*` → `stripe.js` shows `#calendlyOverlay` (`_showCalendlyOverlay(url)`).
