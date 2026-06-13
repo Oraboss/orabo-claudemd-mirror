@@ -220,7 +220,7 @@ japaconnect-backend/
 │   ├── audit.js (+ audit-prompts.js + audit-prompts-ukgt.js)  # Petition Audit — express.json({limit:'8mb'}); dispatch by family
 │   ├── rfe.js (+ rfe-prompts.js + rfe-email-html.js)  # RFE Response — express.json({limit:'8mb'}); four-persona pipeline
 │   ├── universities.js / scholarships.js / visas.js / opportunities.js / stories.js / visits.js / visa-tracker.js  # Content → Orabo Main
-│   ├── dashboard.js     # Dashboard APIs; feature-flagged DASHBOARD_V2_ENABLED
+│   ├── dashboard.js     # Dashboard APIs; JWT-gated
 │   ├── quiz.js          # POST /api/quiz/save-results → Orabo Prod; JWT-gated; rate-limited 10/min
 │   └── internal.js      # POST /api/internal/run-digest — x-digest-secret header
 ├── utils/
@@ -388,7 +388,7 @@ Free quiz on `index.html`: validation in `js/free-quiz-origin.js`. `generateDocx
 - Success URLs append `&session_id={CHECKOUT_SESSION_ID}` (Stripe-substituted; client cannot forge). All tool modules + payment-return scripts read `session_id` from `URLSearchParams` and forward as `stripe_session_id` in the POST body.
 - Webhook events: `checkout.session.completed`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`, `charge.refunded`. Idempotent via `processed_webhook_events(event_id PRIMARY KEY, event_type, processed_at)`; duplicate-key (`23505`) returns 200. All internal errors inside the webhook return 200 (only signature verification returns 4xx).
 - `pro_expires_at` from Stripe's actual `current_period_end` (`sub.current_period_end ?? sub.items?.data?.[0]?.current_period_end`) — never hardcode duration. `checkout.session.completed` uses `.update().eq('id', userId)`.
-- Required Railway env: `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `AI_ROUTES_REQUIRE_STRIPE_SESSION`, `DASHBOARD_V2_ENABLED`.
+- Required Railway env: `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `AI_ROUTES_REQUIRE_STRIPE_SESSION`.
 - **Optional rate/reward env (safe code defaults via `parseInt(...) || default`):** `OPP_RATE_LIMIT_MAX` (5), `OPP_RATE_LIMIT_WINDOW_MIN` (10), `POST_EARN_PAYOUT` (6000), `POST_EARN_REWARD_PER_POST` (300), `POST_EARN_THRESHOLD` (20), `PREVIEW_RATE_LIMIT_MAX` (3), `PREVIEW_RATE_LIMIT_WINDOW_HOURS` (24), `WORTHIT_RATE_LIMIT_MAX` (5), `WORTHIT_RATE_LIMIT_WINDOW_HOURS` (24).
 
 ### Brevo
@@ -443,7 +443,7 @@ EmailJS fully removed — do NOT add any new EmailJS calls anywhere. Use Brevo f
 
 - **Phase 6 widget visibility:** Pro widgets carry `data-plan="pro"`, hidden by `[data-plan="pro"]:not(.unlocked){display:none}` in `dashboard-journey.css`; `refreshUsageStats('pro')` adds `.unlocked`. Free CTA widget hidden by `.dj-widget--hidden`.
 - `dashboard-journey.js` **wraps** (not modifies) `window.updateDashboardForPlan` to fire `refreshUsageStats(plan)`.
-- `GET /api/dashboard/usage-stats`: JWT-gated, `DASHBOARD_V2_ENABLED`; queries `one_off_purchases` by `email`; `utils/tool-value-map.js` is source of truth for `hours_saved`/`value_usd` (`value_usd` must stay in sync with ITEM_PRICES — stripe.js canonical).
+- `GET /api/dashboard/usage-stats`: JWT-gated; queries `one_off_purchases` by `email`; `utils/tool-value-map.js` is source of truth for `hours_saved`/`value_usd` (`value_usd` must stay in sync with ITEM_PRICES — stripe.js canonical).
 - **Preferences modal:** `#prefs-modal` via `body.preferences-modal-open .prefs-modal { display: flex }` — never inline styles.
 - `window._oraboLastJourneyState` set after each `/api/dashboard/state` fetch; used by `openPreferencesModal` prefill.
 - **Iframe close:** listens for `'tool-closed'` postMessage → `closeTool()`. **Pro upgrade from iframes:** post `'initiate-pro-upgrade'` to `window.top`.
@@ -481,7 +481,6 @@ EmailJS fully removed — do NOT add any new EmailJS calls anywhere. Use Brevo f
 - **RLS is enabled on all user-data tables.** Anon: read-only `opportunities WHERE approved=true` + `stories WHERE approved=true`. User JWT: read/write own `user_profiles` row + read-only own `purchases`. All other writes go through the Express backend with the service role key. Never add a new user-data table without RLS policies in the same migration. Canonical reference: `migrations/2026-05-13-rls-pass-2.sql`.
 - **Stripe subscription checkout:** never pass `priceId` from frontend — backend reads `process.env.STRIPE_PRO_PRICE_ID`; frontend sends `{ userId, email, mode: 'subscription' }`.
 - **Dashboard plan state:** always route changes through `updateDashboardForPlan(plan)`.
-- **`DASHBOARD_V2_ENABLED`** gates all `/api/dashboard/*` routes. When false/unset, every dashboard read route returns 404.
 - **CSP is enforced via `_headers` (Cloudflare Pages) — not meta tags.** `_headers` in the repo root is the single authoritative CSP. All per-page `<meta http-equiv="Content-Security-Policy">` tags removed. When adding a new external domain dependency, update `_headers` only. Never re-add meta CSP tags.
 - **CSS specificity hide rule:** prefer `#elementId { display: none }` default + `#elementId.visible-class { display: ... }` override (ID specificity on both sides). Avoid `.hidden-class { display: none }` against `#elementId { display: flex }`.
 - **CSP inline styles:** `style-src` has `'unsafe-inline'` (required for Chart.js). Never use `style="display:none"` on elements that start hidden via JS; use CSS classes.
