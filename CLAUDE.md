@@ -160,7 +160,7 @@ japaconnect/
 │   ├── soptool.js / soptool-questions.js       # SOP Writer; SOP_SECTIONS (7); window.sopTool={init,start}
 │   ├── redirect-paid-tools.js  # Non-module: wires CV/SOP/Consult Start buttons on index.html
 │   ├── hero-cta.js            # Non-module IIFE: #hero-eligibility-cta one-click modal
-│   ├── funnel-track.js        # ES module: first-party funnel analytics on index.html; window.oraboTrack exposed
+│   ├── funnel-track.js        # ES module: first-party funnel analytics on index.html; fires to /api/track
 │   ├── eligibility.js / eligibility-reveal.js  # Visa eligibility checker (14 visas, 11 Qs, 3 free uses) + reveal-at-value upsell; PATHWAY_REVEAL_MAP
 │   ├── autoopen-*.js          # CSP-compliant external boot scripts (one per standalone tool page)
 │   ├── payment-return-checklist.js / -quiz.js / -booking.js  # Non-module payment return handlers
@@ -181,7 +181,7 @@ japaconnect/
 │   ├── worthit.js            # Migration Worth It (imports ROLES from paycalc-data.js, API_URL from config.js)
 │   ├── universities.js / scholarships.js / opportunities.js / opp-teaser.js  # Discovery content modules
 │   ├── newsletter.js        # subscribeToDigest() + waitlistDigestHook()
-│   ├── analytics.js         # GA4 loader; Measurement ID G-W5GY92ZHYS; <script defer> on every page except admin.html
+│   ├── analytics.js         # PostHog funnel instrumentation (EU instance); non-module IIFE; window.oraboTrack exposed
 │   ├── sources.js / sources-paycalc.js / sources-costliving.js / sources-visatracker.js / sources-modal.js  # Source citations (window.OraboSources)
 │   ├── dashboard-journey.js / dashboard-inline.js  # Dashboard logic
 │   ├── config.js            # API_URL export
@@ -400,6 +400,19 @@ Free quiz on `index.html`: validation in `js/free-quiz-origin.js`. `generateDocx
 - `POST /api/internal/run-digest` — `x-digest-secret` header (`DIGEST_TRIGGER_SECRET`); `?force=true` + `?test=true`; never referenced in frontend.
 - Env: `BREVO_API_KEY`, `BREVO_LIST_ID`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `ADMIN_NOTIFY_EMAIL`, `DIGEST_TRIGGER_SECRET`.
 - **Email template logo:** all Brevo templates reference `https://orabo.app/orabo-icon-256x256.png` (`width="80" height="80"` for Outlook). Never use `orabo-icon.svg` in email HTML. Inline styles are permitted in email HTML — the CSP rule applies to the web app only.
+
+### PostHog
+- Funnel measurement and event tracking (EU instance: `eu.i.posthog.com`).
+- Initialized in `js/analytics.js` (non-module IIFE, loaded via `<script src="/js/analytics.js" defer>` on all pages except `admin.html` and `blog/`).
+- Public project API key embedded in `js/analytics.js` — this is the PUBLIC key (`phc_...`), safe to commit. Personal API key must NEVER appear in the repo.
+- Autocapture disabled. Session recording disabled. Surveys disabled. Pageview + pageleave only via SDK; all other events explicit.
+- Privacy posture: `ip: false`, `$ip` blacklisted, `person_profiles: 'identified_only'`, Do Not Track respected.
+- Helper: `window.oraboTrack(event, properties)` — defensive no-op if PostHog fails to load. Defined in `analytics.js`; consumed by `stripe.js` (checkout events) and `eligibility-reveal.js` (reveal events).
+- Tracked events: `homepage_primary_cta_click`, `tool_started` (props: `tool_name`), `checkout_initiated` (props: `item_key`), `checkout_succeeded` (props: `item_key`), `checkout_abandoned` (props: `item_key`), `scroll_depth` (props: `depth_percent`).
+- `tool_started` is fired by a MutationObserver in `analytics.js` watching all `*-tool-modal` elements for the `.active` class — DO NOT wire `tool_started` inside individual tool modules.
+- `reveal_cta_click` and `reveal_shown` (from `js/eligibility-reveal.js`) also route to PostHog via `window.oraboTrack`. As of 2026-06-13 these were redirected from the first-party `/api/track` backend (which was returning 503). When `/api/track` is restored, evaluate whether to dual-fire these to both pipelines.
+- CSP allowlist additions in `_headers`: `script-src https://eu-assets.i.posthog.com`, `connect-src https://eu.i.posthog.com`.
+- Out of scope: session replay, user identification linkage to Supabase auth, backend webhook → PostHog events.
 
 ### Calendly
 - Account: `calendly.com/oraboapp`. Express (30 min): `/oraboapp/30min`. Full (1 hr): `/oraboapp/full-consultation`. Doc Review (45 min): `/oraboapp/document-review`.
@@ -650,7 +663,7 @@ Priority tiers: **Blocking** → **High** → **Medium** → **Low**
 - **CSP `style=""` violations on landings:** `eb-immigration.html` (34) remaining after pass 1 of 2. Dedicated CSP cleanup pass owed (pass 2 after soak).
 - **`js/eb-immigration.js` `.catch` swallows endpoint errors** — shows success message even on error/network-down. Address only if Railway logs show recurring `/api/newsletter/subscribe` errors; give the `.catch` a real inline error state.
 - **Post-signup Pro upgrade breadcrumb (PLANTED, NOT HARVESTED):** `sessionStorage.orabo_post_signup_action = 'pro_upgrade'` set by `js/autoopen-visa-eligibility.js`. Add the reader in (1) `signup.html` post-email-confirmation flow and (2) `dashboard.html` `initDashboard()` (Free plan → `initiateStripeCheckout()` + clear the key). Separate scoped commit.
-- **Privacy policy + consent (from Pass 6 F6.10.1/2/4):** `privacy.html` omits **Anthropic/Claude** (where the most sensitive PII goes), and omits GA4 + ipapi (if reinstated). The cookie clause claims "no tracking cookies" while GA4 (`js/analytics.js`, `G-W5GY92ZHYS`) loads sitewide — a factual contradiction. Add the missing processors, correct the cookie clause, and add a cookie-consent banner. Prince approves copy.
+- **Privacy policy + consent (from Pass 6 F6.10.1/2/4):** `privacy.html` omits **Anthropic/Claude** (where the most sensitive PII goes) and **PostHog** (now loads sitewide via `js/analytics.js` — EU instance, no IP, DNT-respected, but still a third-party processor that must be disclosed). The cookie clause claims "no tracking cookies" while PostHog loads sitewide — correct the cookie clause, add PostHog as a processor, and add a cookie-consent banner. Prince approves copy.
 - **Data-subject-rights endpoints (from Pass 6 F6.10.3):** `privacy.html` promises 30-day account-data deletion but there is no delete-account or export-my-data endpoint/UI (manual email only). Build delete + export endpoints + a dashboard control.
 
 ---
