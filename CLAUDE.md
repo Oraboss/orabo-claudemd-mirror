@@ -61,9 +61,10 @@ Live product surface:
 | `full-doc-checklist.html` | Dashboard iframe: document checklist (Pro card) | No (self-gates) |
 | `migration-timeline.html` | SEO landing — indexable; drives to /dashboard | No |
 | `timeline-tool.html` | Dashboard iframe: Migration Timeline Planner — Pro-gated via `proGate()`; auto-opened by `js/autoopen-timeline.js` (`type=module`); no Stripe; follows `doc-checklist.html` pattern | No (Pro localStorage gate) |
+| `eligibility-tool.html` | Dashboard iframe: Visa Eligibility Checker — free (3-use cap) with Pro bypass via `isPro()`; auto-opened by `js/autoopen-eligibility-tool.js`; Pro upgrade posts `'initiate-pro-upgrade'` to `window.top`; no Stripe; `#eligibilityOverlay` + `#upgradeModalOverlay` markup inline | No (free with cap) |
 | `why-trust-orabo.html` | Public methodology/trust page; indexable; WebPage JSON-LD | No |
 | `readiness-score.html` | SEO landing — drives to `/#readiness` | No |
-| `visa-eligibility.html` | SEO landing + in-place eligibility wizard. Two `.open-eligibility-cta` call `window.openEligibilityModal()`. `#eligibilityOverlay` + `#upgradeModalOverlay` markup duplicated from `index.html`. | No |
+| `visa-eligibility.html` | SEO landing + standalone eligibility runtime. Two `.open-eligibility-cta` call `window.openEligibilityModal()`. `#eligibilityOverlay` + `#upgradeModalOverlay` markup self-contained (not duplicated from `index.html` since Phase B Day 3). Loads `eligibility-reveal.js` for pathway upsell reveal. | No |
 | `document-checklist.html` | SEO landing — drives to `/doc-checklist` | No |
 | `eb-immigration.html` | SEO landing — EB-1A & EB-2 NIW. Hero: two Tier 1 CTA buttons. Footer waitlist (`source: eb_waitlist`) in `js/eb-immigration.js` | No |
 | `eb1a-tool.html` / `eb2-tool.html` | Standalone EB Tier 1 assessments | No |
@@ -110,6 +111,7 @@ japaconnect/
 ├── full-doc-checklist.html  # Dashboard iframe: Pro doc checklist
 ├── migration-timeline.html  # SEO landing; indexable; no auth; drives to /dashboard
 ├── timeline-tool.html       # Dashboard iframe: Migration Timeline Planner (Pro); autoopen-timeline.js type=module; css/timeline.css loaded here directly (NOT from styles.css)
+├── eligibility-tool.html    # Dashboard iframe: Visa Eligibility Checker (free 3-use cap, Pro unlimited); autoopen-eligibility-tool.js; eligibility-reveal.js; no Stripe
 ├── styles.css               # Global styles (imports all css/ partials except timeline.css)
 ├── script.js                # Legacy interactivity (pre-module)
 ├── site.webmanifest         # PWA manifest
