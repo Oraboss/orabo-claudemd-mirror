@@ -64,7 +64,7 @@ Live product surface:
 | `why-trust-orabo.html` | Public methodology/trust page; indexable; WebPage JSON-LD | No |
 | `readiness-score.html` | SEO landing — drives to `/#readiness` | No |
 | `visa-eligibility.html` | SEO landing + in-place eligibility wizard. Two `.open-eligibility-cta` call `window.openEligibilityModal()`. `#eligibilityOverlay` + `#upgradeModalOverlay` markup duplicated from `index.html`. | No |
-| `document-checklist.html` | SEO landing — drives to `/#tools` | No |
+| `document-checklist.html` | SEO landing — drives to `/doc-checklist` | No |
 | `eb-immigration.html` | SEO landing — EB-1A & EB-2 NIW. Hero: two Tier 1 CTA buttons. Footer waitlist (`source: eb_waitlist`) in `js/eb-immigration.js` | No |
 | `eb1a-tool.html` / `eb2-tool.html` | Standalone EB Tier 1 assessments | No |
 | `eb1a-letter-tool.html` / `eb2-letter-tool.html` | Standalone EB Tier 2 letters | No |
@@ -105,7 +105,7 @@ japaconnect/
 ├── consult-booking.html     # Standalone consultation — public; autoopen-consult.js; keeps Supabase UMD
 ├── compare-cities.html      # Pro: compare CoL across 4 cities (Pro localStorage gate)
 ├── all-countries-pay.html   # Pro: pay comparison all countries (module script + separate non-module Pro gate)
-├── doc-checklist.html       # Dashboard iframe: checklist.js + autoopen-checklist.js
+├── doc-checklist.html       # Dashboard iframe: checklist.js + autoopen-checklist.js; css/checklist.css loaded here directly (NOT from styles.css)
 ├── readiness-report.html    # Dashboard iframe: quiz.js + autoopen-quiz.js
 ├── full-doc-checklist.html  # Dashboard iframe: Pro doc checklist
 ├── migration-timeline.html  # SEO landing; indexable; no auth; drives to /dashboard
@@ -309,7 +309,7 @@ No userId for anonymous flow. Download is Word only (DOCX) — `generatePdf()` p
 **`jc_checklist_state` shape:** `{ pathway: "<full label>", pathwayKey: "<snake_case>", country: "<country name>" }`. `oraboChecklistRestore(state)` sets `pathwaySel.value = state.pathwayKey`, `destSel.value = state.country`.
 
 ### Country-of-origin (mandatory)
-Checklist: `id="checklist-country-origin"` (only on doc-checklist.html + full-doc-checklist.html). First option `<option value="" disabled selected>`. `jc_checklist_origin = sel.value`. Quiz: `id="report-country-origin"`, validated before `#quizNext`. `checklist-origin-saver.js` / `quiz-origin-saver.js` use capture-phase `addEventListener('click', fn, true)`; empty → `e.stopImmediatePropagation()` + `.country-select-error.visible`. Do NOT modify `checklist.js` / `quiz.js`.
+Checklist: `id="checklist-country-origin"` (on doc-checklist.html + full-doc-checklist.html). First option `<option value="" disabled selected>`. `jc_checklist_origin = sel.value`. Quiz: `id="report-country-origin"`, validated before `#quizNext`. `checklist-origin-saver.js` / `quiz-origin-saver.js` use capture-phase `addEventListener('click', fn, true)`; empty → `e.stopImmediatePropagation()` + `.country-select-error.visible`. Do NOT modify `checklist.js` / `quiz.js`.
 
 ### SessionStorage bridge
 Before Stripe: `jc_checklist_state` / `jc_quiz_state` + origin keys. After return, `payment-return-*.js` reads/clears keys, passes `country_of_origin` in API body. Both call `fetch()` directly inside `DOMContentLoaded` — no `getSession()` await first. `userId` from `state.userId || null` (currently null). AbortController: 100s checklist, 180s report. Message rotation: 8s checklist, 15s report. Console prefixes `[checklist-return]` / `[quiz-return]`.
@@ -430,7 +430,7 @@ Insights and what they measure:
 - `16GzXehS` — Tool engagement by tool name (30d). Bar chart on tool_started broken down by tool_name. Shows which free tools drive most activity (24 tool keys total per analytics.js TOOL_MODAL_MAP).
 - `NYDVpYKJ` — Conversion funnel: hero CTA → tool started → checkout initiated → checkout succeeded. Funnel query, 7-day conversion window, ordered. Headline business metric — drop-off between steps shows where users are lost.
 
-Instrumentation gaps closed (A.6): `checkout_abandoned` now fires from all 3 payment-return modules (`payment-return-checklist.js` using dynamic `payItem` for both `document_checklist`/`full_doc_checklist`, `payment-return-quiz.js` for `readiness_report`, `payment-return-booking.js` for `consultation_*` items); dead DOMContentLoaded branch removed from `analytics.js` CTA listener (defer guarantees DOM ready); `tool_started` fires for eligibility wizard via `#eligibilityOverlay.open` MutationObserver (not `#wStep1` — that element starts with `.active` in static HTML); `checkout_initiated` fires for `item_key: 'pro_subscription'` on Pro CTA click before auth check in `wireUpgradeModal()`. All new fires guarded with `if (window.oraboTrack)`.
+Instrumentation gaps closed (A.6): `checkout_abandoned` now fires from all 3 payment-return modules (`payment-return-checklist.js` using dynamic `payItem` for both `document_checklist`/`full_doc_checklist`, `payment-return-quiz.js` for `readiness_report`, `payment-return-booking.js` for `consultation_*` items); dead DOMContentLoaded branch removed from `analytics.js` CTA listener (defer guarantees DOM ready); `tool_started` fires for eligibility wizard via `#eligibilityOverlay.open` MutationObserver (not `#wStep1` — that element starts with `.active` in static HTML); `checkout_initiated` fires for `item_key: 'pro_subscription'` on Pro CTA click before auth check in `wireUpgradeModal()`. All new fires guarded with `if (window.oraboTrack)`. `tool_started` fires for document checklist wizard via `#checklistWizardOverlay.open` MutationObserver in `analytics.js` (mirrors eligibility pattern; watches `.open` class, fires `{ tool_name: 'document_checklist' }`).
 
 Adding new events:
 Whenever a new event is added to client-side JS (analytics.js, stripe.js, or any new module), the corresponding insight must be added to dashboard 746213. Update this block with the new insight short_id, name, and what it measures so this section stays the authoritative inventory of what PostHog tracks.
