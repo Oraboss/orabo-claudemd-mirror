@@ -150,7 +150,7 @@ japaconnect/
 │   ├── auth.js              # Supabase session, profile cache, openAuthModal; defensive window.supabase check — safe to import without Supabase UMD; exports readSessionFromStorage()
 │   ├── reset-password.js    # Reset-password page logic (external — inline scripts CSP-blocked). Uses supabaseClient.
 │   ├── embed.js             # Sets html.embed-mode synchronously
-│   ├── stripe.js            # Checkout + payment return; purchaseItem resolves email bookingMeta.customer_email → booking_email → user.email; checkPaymentReturn IIFE preserves URL for payment_cancelled=1; bypass list 32 keys
+│   ├── stripe.js            # Checkout + payment return; purchaseItem resolves email bookingMeta.customer_email → booking_email → user.email; checkPaymentReturn IIFE preserves URL for payment_cancelled=1; bypass list 33 keys
 │   ├── subscription.js      # isPro() + upgrade modal
 │   ├── checklist.js         # Document checklist wizard engine (do not modify for payment-return/bypass/origin)
 │   ├── quiz.js              # Readiness quiz engine + AI report (do not modify for payment-return)
@@ -390,7 +390,7 @@ Free quiz on `index.html`: validation in `js/free-quiz-origin.js`. `generateDocx
 - **Consultation:** `consult-booking.html?payment_success=1&item=consultation_*` → `stripe.js` shows `#calendlyOverlay`.
 - **Other:** `index.html?payment_success=1&item=...` / `?payment=cancelled`.
 - **Standalone page returns:** `readiness_report` → `readiness-report.html`; `document_checklist` → `doc-checklist.html`. Handled by `payment-return-*.js`.
-- **Cancel return:** managed via `TOOL_CANCEL_PAGES` map in `routes/stripe.js`. Each tool item cancels to its own page with `?payment_cancelled=1&item=<key>`. Dashboard-originated items cancel to `dashboard.html?payment=cancelled`; all others to `/?payment=cancelled`. `js/stripe.js` bypass list and `TOOL_CANCEL_PAGES` must match the canonical Stripe item key set (report as an absolute count, currently 32 keys — grep `js/stripe.js` to verify rather than incrementing from memory).
+- **Cancel return:** managed via `TOOL_CANCEL_PAGES` map in `routes/stripe.js`. Each tool item cancels to its own page with `?payment_cancelled=1&item=<key>`; `verified_badge` uses an empty-string page value which resolves to the homepage (`/?payment_cancelled=1&item=verified_badge`). All other items (including `pro_subscription`) go to `/?payment=cancelled` via the fallback else branch. `js/stripe.js` bypass list and `TOOL_CANCEL_PAGES` must match the canonical Stripe item key set (report as an absolute count, currently 33 keys — grep `js/stripe.js` to verify rather than incrementing from memory).
 - Success URLs append `&session_id={CHECKOUT_SESSION_ID}` (Stripe-substituted; client cannot forge). All tool modules + payment-return scripts read `session_id` from `URLSearchParams` and forward as `stripe_session_id` in the POST body.
 - Webhook events: `checkout.session.completed`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`, `charge.refunded`. Idempotent via `processed_webhook_events(event_id PRIMARY KEY, event_type, processed_at)`; duplicate-key (`23505`) returns 200. All internal errors inside the webhook return 200 (only signature verification returns 4xx).
 - `pro_expires_at` from Stripe's actual `current_period_end` (`sub.current_period_end ?? sub.items?.data?.[0]?.current_period_end`) — never hardcode duration. `checkout.session.completed` uses `.update().eq('id', userId)`.
