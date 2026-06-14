@@ -57,13 +57,13 @@ Live product surface:
 | `compare-cities.html` | Pro: compare cost of living across 4 cities | Pro localStorage gate |
 | `all-countries-pay.html` | Pro: take-home pay across all 9 countries × 35 roles | Pro localStorage gate |
 | `doc-checklist.html` | Dashboard iframe: document checklist wizard (free preview) | No (self-gates) |
-| `readiness-report.html` | Dashboard iframe: readiness quiz | No (self-gates) |
+| `readiness-report.html` | Dashboard iframe: readiness quiz; standalone runtime target for `readiness-score.html` and `index.html` teaser CTAs; loads `quiz-retake-handler.js` for dashboard retake sessionStorage cleanup | No (self-gates) |
 | `full-doc-checklist.html` | Dashboard iframe: document checklist (Pro card) | No (self-gates) |
 | `migration-timeline.html` | SEO landing — indexable; drives to /dashboard | No |
 | `timeline-tool.html` | Dashboard iframe: Migration Timeline Planner — Pro-gated via `proGate()`; auto-opened by `js/autoopen-timeline.js` (`type=module`); no Stripe; follows `doc-checklist.html` pattern | No (Pro localStorage gate) |
 | `eligibility-tool.html` | Dashboard iframe: Visa Eligibility Checker — free (3-use cap) with Pro bypass via `isPro()`; auto-opened by `js/autoopen-eligibility-tool.js`; Pro upgrade posts `'initiate-pro-upgrade'` to `window.top`; no Stripe; `#eligibilityOverlay` + `#upgradeModalOverlay` markup inline | No (free with cap) |
 | `why-trust-orabo.html` | Public methodology/trust page; indexable; WebPage JSON-LD | No |
-| `readiness-score.html` | SEO landing — drives to `/#readiness` | No |
+| `readiness-score.html` | SEO landing — drives to `/readiness-report.html` | No |
 | `visa-eligibility.html` | SEO landing + standalone eligibility runtime. Two `.open-eligibility-cta` call `window.openEligibilityModal()`. `#eligibilityOverlay` + `#upgradeModalOverlay` markup self-contained (not duplicated from `index.html` since Phase B Day 3). Loads `eligibility-reveal.js` for pathway upsell reveal. | No |
 | `document-checklist.html` | SEO landing — drives to `/doc-checklist` | No |
 | `eb-immigration.html` | SEO landing — EB-1A & EB-2 NIW. Hero: two Tier 1 CTA buttons. Footer waitlist (`source: eb_waitlist`) in `js/eb-immigration.js` | No |
@@ -432,7 +432,7 @@ Insights and what they measure:
 - `16GzXehS` — Tool engagement by tool name (30d). Bar chart on tool_started broken down by tool_name. Shows which free tools drive most activity (24 tool keys total per analytics.js TOOL_MODAL_MAP).
 - `NYDVpYKJ` — Conversion funnel: hero CTA → tool started → checkout initiated → checkout succeeded. Funnel query, 7-day conversion window, ordered. Headline business metric — drop-off between steps shows where users are lost.
 
-Instrumentation gaps closed (A.6): `checkout_abandoned` now fires from all 3 payment-return modules (`payment-return-checklist.js` using dynamic `payItem` for both `document_checklist`/`full_doc_checklist`, `payment-return-quiz.js` for `readiness_report`, `payment-return-booking.js` for `consultation_*` items); dead DOMContentLoaded branch removed from `analytics.js` CTA listener (defer guarantees DOM ready); `tool_started` fires for eligibility wizard via `#eligibilityOverlay.open` MutationObserver (not `#wStep1` — that element starts with `.active` in static HTML); `checkout_initiated` fires for `item_key: 'pro_subscription'` on Pro CTA click before auth check in `wireUpgradeModal()`. All new fires guarded with `if (window.oraboTrack)`. `tool_started` fires for document checklist wizard via `#checklistWizardOverlay.open` MutationObserver in `analytics.js` (mirrors eligibility pattern; watches `.open` class, fires `{ tool_name: 'document_checklist' }`).
+Instrumentation gaps closed (A.6): `checkout_abandoned` now fires from all 3 payment-return modules (`payment-return-checklist.js` using dynamic `payItem` for both `document_checklist`/`full_doc_checklist`, `payment-return-quiz.js` for `readiness_report`, `payment-return-booking.js` for `consultation_*` items); dead DOMContentLoaded branch removed from `analytics.js` CTA listener (defer guarantees DOM ready); `tool_started` fires for eligibility wizard via `#eligibilityOverlay.open` MutationObserver (not `#wStep1` — that element starts with `.active` in static HTML); `checkout_initiated` fires for `item_key: 'pro_subscription'` on Pro CTA click before auth check in `wireUpgradeModal()`. All new fires guarded with `if (window.oraboTrack)`. `tool_started` fires for document checklist wizard via `#checklistWizardOverlay.open` MutationObserver in `analytics.js` (mirrors eligibility pattern; watches `.open` class, fires `{ tool_name: 'document_checklist' }`). `tool_started` fires for readiness quiz via `#quizOverlay.open` MutationObserver in `analytics.js` (watches `.open` class, fires `{ tool_name: 'readiness_quiz' }`).
 
 Adding new events:
 Whenever a new event is added to client-side JS (analytics.js, stripe.js, or any new module), the corresponding insight must be added to dashboard 746213. Update this block with the new insight short_id, name, and what it measures so this section stays the authoritative inventory of what PostHog tracks.
@@ -470,7 +470,7 @@ EmailJS fully removed — do NOT add any new EmailJS calls anywhere. Use Brevo f
 | `showToast(message, type)` | `type`: `'success'`/`'error'`/`'info'` |
 | `openPreferencesModal(prefill)` / `closePreferencesModal()` | `#prefs-modal`; toggles `body.preferences-modal-open` |
 | `handlePreferencesSubmit(e)` | Validates, reads JWT via localStorage scan, POSTs to `/api/dashboard/preferences`, calls `loadJourneyState()` |
-| `handleRetakeQuiz()` | Sets `sessionStorage.orabo_retaking_quiz='1'` then `window.location.href='/#readiness'` (top-frame nav preserves sessionStorage) |
+| `handleRetakeQuiz()` | Calls `openTool(tool)` with tool-id `'full-readiness-report'` — loads `readiness-report.html?embed=true` in the dashboard iframe. No top-frame navigation; no sessionStorage flag. `quiz-retake-handler.js` on `readiness-report.html` clears stale `orabo_quiz_saved`/`jc_quiz_state`/`jc_quiz_origin` on every load. |
 | `wireJourneyCtas()` | Wires `data-cta` buttons + delegated listener on `#dash-journey-panel` for `data-action="open-prefs-edit"` / `"retake-quiz"` |
 | `loadJourneyState()` | Alias for `window.loadJourneyState`; refresh widgets after preferences save |
 | `renderRecommendedTools(...)` | Branches on `cta_url`: `sidebar:<tool-id>` → `.dash-tool-card[data-tool-id]` `.click()`; plain URL → `window.open(url,'_blank','noopener')`. Mapping in backend `utils/dashboard-rules.js`. Do NOT modify `dashboard-inline.js` for routing. |
