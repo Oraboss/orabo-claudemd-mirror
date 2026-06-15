@@ -416,9 +416,38 @@ Free quiz on `index.html`: validation in `js/free-quiz-origin.js`. `generateDocx
 - Helper: `window.oraboTrack(event, properties)` — defensive no-op if PostHog fails to load. Defined in `analytics.js`; consumed by `stripe.js` (checkout events) and `eligibility-reveal.js` (reveal events).
 - Tracked events: `homepage_primary_cta_click`, `tool_started` (props: `tool_name`), `checkout_initiated` (props: `item_key`), `checkout_succeeded` (props: `item_key`), `checkout_abandoned` (props: `item_key`), `scroll_depth` (props: `depth_percent`).
 - `tool_started` is fired by a MutationObserver in `analytics.js` watching all `*-tool-modal` elements for the `.active` class — DO NOT wire `tool_started` inside individual tool modules.
-- `reveal_cta_click` and `reveal_shown` (from `js/eligibility-reveal.js`) also route to PostHog via `window.oraboTrack`. As of 2026-06-13 these were redirected from the first-party `/api/track` backend (which was returning 503). When `/api/track` is restored, evaluate whether to dual-fire these to both pipelines.
+- `reveal_cta_click` / `reveal_shown` and `reveal_at_value_clicked` / `reveal_at_value_shown` (from `js/eligibility-reveal.js`) route to PostHog via `window.oraboTrack`. Dual-fire window 2026-06-15 to ~2026-07-26: old names fired alongside spec names for history continuity. Sunset old names in Strand 1 Commit 1C. Property bag: `{tool, destination, cta_target, cta_price, user_pro_status, pathway}`.
 - CSP allowlist additions in `_headers`: `script-src https://eu-assets.i.posthog.com`, `connect-src https://eu.i.posthog.com`.
 - Out of scope: session replay, user identification linkage to Supabase auth, backend webhook → PostHog events.
+
+### Reveal-at-Value Architecture (`js/eligibility-reveal.js`)
+
+After a free eligibility result renders, the user sees a CTA to the next paid rung with destination-aware routing and an attorney-fee anchor (per UX Phase Plan v1.0 §7.1). Shipped 2026-05-24 (`50cfb93`), copy/analytics aligned 2026-06-15 (Strand 1 Commit 1A).
+
+**Pattern:** Sibling non-module IIFE on `visa-eligibility.html` and `eligibility-tool.html`. MutationObserver on `#eligResultsView` watching `style`/`hidden` attributes. Idempotency via `_revealed` flag (resets on hide — handles back-button re-renders cleanly). Destination routing via `PATHWAY_REVEAL_MAP` (visa display name → config entry); unrecognised visas fall through to `DEFAULT_PATHWAY`.
+
+**Routing table** (precedence: O-1 family → EB family → UK → other):
+
+| Visa name | page | destination | cta_price |
+|---|---|---|---|
+| O-1 Extraordinary Ability | /o1a-visa.html | usa-o1 | $250 |
+| EB-2 National Interest Waiver | /eb-immigration.html | usa-eb | $240 |
+| EB-1A Extraordinary Ability | /eb-immigration.html | usa-eb | $240 |
+| Global Talent Visa | /uk-global-talent.html | uk | $250 |
+| DEFAULT (all others) | /pathway-match-tool.html | other | $19 |
+
+**Attorney-fee anchor:** US routes — "Attorneys typically charge $4,000–$15,000 for the same work."; UK route — "UK immigration firms typically charge £3,000–£10,000 for the same work."; $19 fallback — no anchor.
+
+**CTA headings (action framing):** "Build your full O-1A petition package" / "Build your full EB-1A or EB-2 NIW petition package" / "Build your full UK Global Talent endorsement package" / "Get your personalised pathway recommendation" ($19). Button label: "Build my package →" for petition tiers; "Get Your Pathway Match Report →" for the $19 tier.
+
+**Pro user behavior (intentional deviation from §7.1):** Pro users whose top-matched visa is in `PATHWAY_REVEAL_MAP` see a neutral explore link (no upsell, no attorney anchor, no pricing). Users whose top visa is NOT in the map see nothing. Rationale: Pro users still benefit from a navigation cue post-quiz; suppression loses value. Detection: `localStorage.getItem('orabo_pro_status') === 'true'`. `reveal_at_value_shown` fires for Pro renders (`user_pro_status: true`); no click event on the neutral link.
+
+**PostHog events (both fire on every non-early-return render):**
+- Shown: `reveal_shown` (old, sunset ~2026-07-26) + `reveal_at_value_shown` (spec name)
+- Click: `reveal_cta_click` (old, sunset ~2026-07-26) + `reveal_at_value_clicked` (spec name)
+- Property bag: `{tool: 'eligibility', destination, cta_target, cta_price, user_pro_status, pathway}`
+
+**Commit 1B (quiz reveal-at-value):** ships 24h after Strand 1 Commit 1A production smoke. Will use spec event names directly (no dual-fire); `tool` property will be `'quiz'`.
 
 ### PostHog dashboard — "Orabo Production — Funnel & Health" (built 2026-06-13)
 
