@@ -706,6 +706,8 @@ EmailJS fully removed — do NOT add any new EmailJS calls anywhere. Use Brevo f
 
 - **Testimonial fetch deferral (commit shipped 2026-06-17):** `js/featured-testimonial.js` now triggers `init()` via `requestIdleCallback` (with `setTimeout` fallback) after the `load` event, rather than on `DOMContentLoaded`. This recovers ~5–7s of mobile LCP under Lighthouse 4G throttle simulation by yielding the network call until critical-path resources complete. Real-user warm-cache LCP was unaffected (352ms pre and post). The 500ms render delay on the testimonial itself is imperceptible — it's a below-the-fold trust signal.
 
+- **`/api/track` 503 observability fix (commit shipped 2026-06-17):** `js/funnel-track.js` previously absorbed all fetch failures via `.catch(() => {})` — including 503s from Railway infrastructure (cold starts, restarts). This created an "unknown duration" diagnostic gap. Fix routes failures through PostHog as funnel_track_failure events with {event, err} properties (err truncated to 80 chars). UX silent-failure contract preserved — no console output, no user impact. Future `/api/track` problems will now surface in PostHog dashboards. Endpoint architecture is sound (route returns 204 before any sync work — incapable of app-layer 503); all observed 503s originate from Railway infrastructure or network path. Two failure paths handled: HTTP error statuses (resolved responses with `response.ok === false`, `err: 'http_NNN'`) and network failures (rejected promises, `err: message.slice(0, 80)`).
+
 Phase D Strand 2 completion date: 2026-06-16.
 
 ---
