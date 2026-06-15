@@ -670,6 +670,36 @@ EmailJS fully removed — do NOT add any new EmailJS calls anywhere. Use Brevo f
 - **Dual-DB architecture:** OPS data → Orabo Prod (`rrkkbnoqubfmhrnxgngp`, Supabase JS client, `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`). Content data → Orabo Main (`fcogjoxcfmrcuvtreivm`, `pg.Pool` in `db/client.js`, `DB_*`). Never JOIN across DBs. Confirm the project ref before migrations.
 - **No em dashes (—, U+2014) in published content.** Blog body, meta tags, public marketing copy must not contain em dashes; replace with commas/periods/colons/semicolons/parentheses. En dashes (–) for numeric ranges and hyphens in compounds are correct. Blog titles use ` | Orabo Blog`. Extends to AI-generated user-facing text — include "do not use em dashes" in every AI-route system prompt. Internal docs (this file, audit `.md`, prompts) are exempt.
 
+### Phase D Strand 2 — Visual Modernisation
+
+**Shipped 2026-06-15 (Commit 2A) and 2026-06-16 (Commit 2B). UX Plan v1.0 §7.2.**
+
+**Commit 2A — Above-the-fold trust signals** (`c75bae0`, 2026-06-15):
+- Hero testimonial fetched from CONTENT DB `stories` table (filter `approved = true`, not `status = 'approved'` — table uses boolean column)
+- `/api/stories` endpoint (Railway backend) is used twice on `/`: once by grid (`js/stories.js`), once by featured testimonial (`js/featured-testimonial.js`). Duplicate fetch accepted for V1; revisit if approved count > 50
+- Curation strategy is auto-adapting in code — no maintenance commits needed as approved count grows:
+  - >= 10 approved: random rotation per page load
+  - 5-9 approved: random from top 5 most-recent
+  - < 5 approved: pinned to most-recent verified story (fallback to most-recent)
+- Founder credit line links to existing `/author/abiodun-bello` page
+- PostHog event `hero_testimonial_shown` fires per render with `{story_id, verified, destination}`
+- Silent failure on fetch error — hero remains functional without testimonial
+
+**Commit 2B — Visual rhythm** (CSS-only):
+- Hero H1: `clamp(2.4rem, 5vw, 3.8rem)` to `clamp(2.6rem, 5.5vw, 4.4rem)`. Pre-2B LCP 652ms; post-2B LCP within 10% tolerance gate
+- Band header padding doubled at desktop (`2rem 1rem 0.75rem` to `4rem 1rem 1.5rem`); 67% increase at mobile to preserve vertical space
+- `--shadow` and `--shadow-lg` upgraded to multi-layer stack preserving navy brand tint `rgba(26,60,110,*)`
+- Three hardcoded shadow values normalised to use the tokens: `.story-card:hover`, `.worthit-form-card`, `.tool-landing-card:hover`
+
+**Five intentional shadow deviations preserved -- do NOT normalise:**
+- `.live-card:hover` (accent blue `rgba(74,144,217,*)` -- distinct surface identity)
+- `.consult-card.featured-plan` (gold `rgba(245,166,35,*)` -- featured elevation)
+- `.tool-landing-card.featured` (accent blue)
+- `.dash-tool-card:hover` (neutral grey -- dashboard intentionally lower-key)
+- Button glow shadows (`.btn-primary`, `.btn-gold`)
+
+Phase D Strand 2 completion date: 2026-06-16.
+
 ---
 
 ## Design System
