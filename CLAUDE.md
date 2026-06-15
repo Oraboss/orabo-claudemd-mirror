@@ -451,7 +451,7 @@ After a free eligibility result renders, the user sees a CTA to the next paid ru
 - Same sibling-IIFE + MutationObserver pattern as eligibility
 - Target container: `#quizResultsScreen` — only on `readiness-report.html` (index.html and readiness-score.html link out; quiz-email-capture.js is a disabled stub so no DOM ordering constraint)
 - Observer: `attributeFilter: ['style']`; visibility: `style.display !== 'none' && offsetParent !== null`
-- Destination extraction: `jc_quiz_state.answers.destination_value` (NOT `.country` — CLAUDE.md had stale reference; quiz.js stores destination inside the `.answers` sub-object at key `destination_value`)
+- Destination extraction: event-delegation click capture on `.quiz-options button` text (quiz.js only writes `jc_quiz_state` to sessionStorage at Pay button click — too late for result-render; `jc_quiz_state.answers.destination_value` kept as fallback). `DEST_LABELS` maps Q7 button text (e.g. 'United Kingdom') to route key ('UK'). `_destValue` reset on results-hide to avoid stale value on retake.
 - Routing: USA → `/eb-immigration.html` ($240); UK → `/uk-global-talent.html` ($250); all others → `/pathway-match-tool.html` ($19). No O-1A split — quiz has no extraordinary-ability signals; EB hub cross-links to O-1A for self-navigation
 - PostHog events: `reveal_at_value_shown` / `reveal_at_value_clicked` ONLY (no dual-fire — quiz has no historical events to preserve)
 - Property bag: `{tool: 'quiz', destination, cta_target, cta_price, user_pro_status, pathway}` where `pathway` is raw `destination_value` (e.g. 'UK', 'USA')
