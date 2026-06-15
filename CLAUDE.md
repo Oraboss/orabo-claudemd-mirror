@@ -447,7 +447,21 @@ After a free eligibility result renders, the user sees a CTA to the next paid ru
 - Click: `reveal_cta_click` (old, sunset ~2026-07-26) + `reveal_at_value_clicked` (spec name)
 - Property bag: `{tool: 'eligibility', destination, cta_target, cta_price, user_pro_status, pathway}`
 
-**Commit 1B (quiz reveal-at-value):** ships 24h after Strand 1 Commit 1A production smoke. Will use spec event names directly (no dual-fire); `tool` property will be `'quiz'`.
+**Quiz reveal (`js/quiz-reveal-at-value.js`, shipped 2026-06-15 Strand 1 Commit 1B):**
+- Same sibling-IIFE + MutationObserver pattern as eligibility
+- Target container: `#quizResultsScreen` — only on `readiness-report.html` (index.html and readiness-score.html link out; quiz-email-capture.js is a disabled stub so no DOM ordering constraint)
+- Observer: `attributeFilter: ['style']`; visibility: `style.display !== 'none' && offsetParent !== null`
+- Destination extraction: `jc_quiz_state.answers.destination_value` (NOT `.country` — CLAUDE.md had stale reference; quiz.js stores destination inside the `.answers` sub-object at key `destination_value`)
+- Routing: USA → `/eb-immigration.html` ($240); UK → `/uk-global-talent.html` ($250); all others → `/pathway-match-tool.html` ($19). No O-1A split — quiz has no extraordinary-ability signals; EB hub cross-links to O-1A for self-navigation
+- PostHog events: `reveal_at_value_shown` / `reveal_at_value_clicked` ONLY (no dual-fire — quiz has no historical events to preserve)
+- Property bag: `{tool: 'quiz', destination, cta_target, cta_price, user_pro_status, pathway}` where `pathway` is raw `destination_value` (e.g. 'UK', 'USA')
+- CTA block carries `data-tool="quiz"` for disambiguation from eligibility surface in smoke tests
+- Injection: `insertBefore(block, #fullReportBox)` — between `#lockedReportBox` and `#fullReportBox`
+- Pro behavior: same intentional deviation as Commit 1A — neutral link to hub, no suppression, no attorney anchor
+
+Quiz reveal-at-value implementation date: 2026-06-15. Sunset dual-fire eligibility events ~2026-07-26 in Strand 1 Commit 1C.
+
+1A→1B soak waived 2026-06-15 by founder override. Standard 24h soak resumes for Strand 2.
 
 ### PostHog dashboard — "Orabo Production — Funnel & Health" (built 2026-06-13)
 
