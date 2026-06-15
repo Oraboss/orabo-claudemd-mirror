@@ -698,6 +698,14 @@ EmailJS fully removed — do NOT add any new EmailJS calls anywhere. Use Brevo f
 - `.dash-tool-card:hover` (neutral grey -- dashboard intentionally lower-key)
 - Button glow shadows (`.btn-primary`, `.btn-gold`)
 
+**Operational notes (added 2026-06-17, post-2B soak window):**
+
+- **Mobile H1 typography is governed by `css/mobile.css` `!important` override at ≤768px**, not by `css/hero.css`. The Strand 2 §7.2 sub-strand 2c H1 size-up (`clamp(2.6rem, 5.5vw, 4.4rem)`) is desktop-only; mobile retains the prior `clamp(2rem, 8vw, 3rem)` from `mobile.css`. Future visual passes targeting hero typography across all viewports must edit BOTH `css/hero.css` (desktop) AND `css/mobile.css` (the `!important` mobile override) — editing only one will not propagate to the other due to the `!important` precedence.
+
+- **Root font-size is `17px`, not the browser default 16px.** All `rem`-based calculations in this codebase compute against 17px. For example, `1rem = 17px`, `2rem = 34px`, `4.4rem = 74.8px`. When sizing new elements via `rem`, verify computed pixel values against expectations using this scale, not the standard 16px assumption. Source of the 17px override is not documented elsewhere in CLAUDE.md as of 2026-06-17; treated as intentional pending future audit. If a future codebase pass establishes this was unintentional, the entire type system should be re-evaluated.
+
+- **Testimonial fetch deferral (commit shipped 2026-06-17):** `js/featured-testimonial.js` now triggers `init()` via `requestIdleCallback` (with `setTimeout` fallback) after the `load` event, rather than on `DOMContentLoaded`. This recovers ~5–7s of mobile LCP under Lighthouse 4G throttle simulation by yielding the network call until critical-path resources complete. Real-user warm-cache LCP was unaffected (352ms pre and post). The 500ms render delay on the testimonial itself is imperceptible — it's a below-the-fold trust signal.
+
 Phase D Strand 2 completion date: 2026-06-16.
 
 ---
