@@ -18,6 +18,7 @@ Orabo is a platform offering verified pathways to study, work, and migrate legal
 Live product surface:
 
 - **Free tools (African-first):** Readiness Quiz, Visa Eligibility Checker (14 visas, 11 questions, 3 free uses), Document Checklist, Cost of Living (33 cities), Take-Home Pay (35 roles × 18 countries), Processing Times (18 visas), Compare Destinations, Migration Worth It Calculator, University/Scholarship/Opportunity discovery pages.
+- **Motion infrastructure (Phase 1):** `css/motion.css` + `js/motion.js` (ES module) — shared utilities for homepage count-up animations and reveal transitions across all four motion phases. 13 `.is-counter` spans wired on the homepage; card hover-lift on `.us-tool-card`, `.tool-landing-card`, `.consult-card`, `.blog-teaser-card`. `prefers-reduced-motion` respected throughout. Phase 2–4 consume `initReveal()` and the `.reduced-motion` html class flag.
 - **Paid AI tools (global audience):**
   - CV Review + Cover Letter; SOP Writer (9 tracks).
   - EB-1A & EB-2 NIW suites — Tier 1 assessment / Tier 2 letter / Tier 3 package.
