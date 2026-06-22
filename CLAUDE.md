@@ -367,7 +367,7 @@ Free quiz on `index.html`: validation in `js/free-quiz-origin.js`. `generateDocx
 - **Client:** Supabase JS client instantiated inline in each route that needs it (`admin.js`, `checklist.js`, `cv.js`, `sop.js`, `eb1a.js`, `eb2.js`, `o1a.js`, `report.js`, `stripe.js`, `ukgt-tech.js`, `quiz.js`, `audit.js`, `verify-payment.js`, etc.)
 - **Tables:** `user_profiles`, `purchases`, `one_off_purchases`, `ai_cache`, `processed_webhook_events`, `analytics_events`
 - Auth lives here. Email verification redirect: `https://orabo.app/login.html?verified=true`. Password reset redirect: `https://orabo.app/reset-password` (no `.html` in the `redirectTo` string passed to `resetPasswordForEmail`).
-- `user_profiles` columns: `id`, `pro_status`, `pro_expires_at`, `stripe_customer_id`, `stripe_subscription_id`, `quiz_results` (jsonb), `user_preferences` (jsonb), `journey_state` (jsonb), `role` (admin gate).
+- `user_profiles` columns: `id`, `email`, `full_name`, `country_origin`, `pro_status`, `pro_expires_at`, `stripe_customer_id`, `stripe_subscription_id`, `quiz_results` (jsonb), `user_preferences` (jsonb), `journey_state` (jsonb), `role` (admin gate). `email`/`full_name`/`country_origin` are written at signup by `js/signup.js`; for any backfill the canonical email source is auth `auth.users` via `supabase.auth.admin.listUsers()`, not this table.
 - `one_off_purchases` columns: `id`, `name`, `email`, `tool`, `stripe_session_id` (nullable), `created_at`.
 
 #### 2. Orabo Main (content / CMS / analytics)
