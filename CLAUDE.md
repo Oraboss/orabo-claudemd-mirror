@@ -229,6 +229,7 @@ japaconnect-backend/
 │   ├── universities.js / scholarships.js / visas.js / opportunities.js / stories.js / visits.js / visa-tracker.js  # Content → Orabo Main
 │   ├── dashboard.js     # Dashboard APIs; JWT-gated
 │   ├── quiz.js          # POST /api/quiz/save-results → Orabo Prod; JWT-gated; rate-limited 10/min
+│   ├── profile.js       # POST /api/profile/create — user_profiles row at signup (OPS service-role); email resolved server-side via getUserById; profileLimiter 30/hr/IP
 │   └── internal.js      # POST /api/internal/run-digest — x-digest-secret header
 ├── utils/
 │   ├── verify-payment.js     # Payment gate for all AI routes
@@ -367,7 +368,7 @@ Free quiz on `index.html`: validation in `js/free-quiz-origin.js`. `generateDocx
 - **Client:** Supabase JS client instantiated inline in each route that needs it (`admin.js`, `checklist.js`, `cv.js`, `sop.js`, `eb1a.js`, `eb2.js`, `o1a.js`, `report.js`, `stripe.js`, `ukgt-tech.js`, `quiz.js`, `audit.js`, `verify-payment.js`, etc.)
 - **Tables:** `user_profiles`, `purchases`, `one_off_purchases`, `ai_cache`, `processed_webhook_events`, `analytics_events`
 - Auth lives here. Email verification redirect: `https://orabo.app/login.html?verified=true`. Password reset redirect: `https://orabo.app/reset-password` (no `.html` in the `redirectTo` string passed to `resetPasswordForEmail`).
-- `user_profiles` columns: `id`, `email`, `full_name`, `country_origin`, `pro_status`, `pro_expires_at`, `stripe_customer_id`, `stripe_subscription_id`, `quiz_results` (jsonb), `user_preferences` (jsonb), `journey_state` (jsonb), `role` (admin gate). `email`/`full_name`/`country_origin` are written at signup by `js/signup.js`; for any backfill the canonical email source is auth `auth.users` via `supabase.auth.admin.listUsers()`, not this table.
+- `user_profiles` columns: `id`, `email`, `full_name`, `country_origin`, `pro_status`, `pro_expires_at`, `stripe_customer_id`, `stripe_subscription_id`, `quiz_results` (jsonb), `user_preferences` (jsonb), `journey_state` (jsonb), `role` (admin gate). The row is created at signup time by the backend (NOT a client-side insert — that always failed under RLS, and the `auth.users` `handle_new_user` trigger approach is dead/dropped): `js/signup.js` fires `POST /api/profile/create` with `{ userId, email, name, country_origin }`; `routes/profile.js` (OPS service-role client, dedicated `profileLimiter` 30/hr/IP) does an idempotent `upsert({ id, email, full_name, country_origin }, { onConflict:'id', ignoreDuplicates:true })`. **Security:** the endpoint resolves `email` server-side from `auth.users` via `getUserById(userId)` (400 if the user doesn't exist) and ignores the client-supplied body email — closing the IDOR/email-poisoning vector; `name`/`country_origin` stay client-supplied (cosmetic) and are protected from overwrite by `ignoreDuplicates`. Never set `pro_status`/`stripe_*`/`role` via this endpoint. For any backfill the canonical email source is auth `auth.users` via `supabase.auth.admin.listUsers()`, not this table (`scripts/backfill-user-profiles.js`).
 - `one_off_purchases` columns: `id`, `name`, `email`, `tool`, `stripe_session_id` (nullable), `created_at`.
 
 #### 2. Orabo Main (content / CMS / analytics)
