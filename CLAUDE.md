@@ -84,6 +84,7 @@ Live product surface:
 | `rfe-response-tool.html` | RFE Response Copilot tool; `noindex,nofollow`; two-file upload | No |
 | `universities.html` / `scholarships.html` / `opportunities.html` | Discovery pages — full navbar + footer; self-init module | No |
 | `cost-of-living.html` / `take-home-pay.html` / `visa-pathways.html` / `processing-times.html` | Discovery pages extracted from homepage; full navbar + footer; FAQPage JSON-LD | No |
+| `news.html` | Immigration News Feed — indexable; full navbar + footer; `NewsMediaOrganization` JSON-LD; reads `/api/news`; filter pills (All/USA/UK) + visa-type `<select>` + opt-in Community pill; `js/newsfeed.js` (ES module, `createElement`-only render). Phase 1 read-only (Phase 2 `js/news-interactions.js` + Phase 3 context trigger not built) | No |
 | `pathway-compare.html` | Compare Destinations — free; navbar + footer; no auth, no backend | No |
 | `migration-worth-it.html` | Migration Worth It — free, public, SEO-indexed; no auth/payment | No |
 | `admin.html` | Admin panel — not linked publicly; direct URL only; loads `css/admin.css` + `js/admin.js` | Admin (Bearer JWT + `user_profiles.role='admin'`) |
@@ -143,6 +144,7 @@ japaconnect/
 │   ├── pathway-compare.css + pathway-compare-overview.css  # Compare Destinations
 │   ├── sources.css          # Source citation modal + tags
 │   ├── discovery-pages.css  # .dp-page-hero, .dp-cta-block, .opp-optional-label
+│   ├── news.css             # News Feed (/news) — .news-card (official/community badge variants), .news-grid, .news-filter-bar (reuses .filter-row/.filter-btn from cards.css); imported in styles.css after discovery-pages.css, before mobile.css
 │   ├── author.css           # Byline component + author page
 │   ├── admin.css            # Admin panel — loaded by admin.html only, NOT in styles.css
 │   ├── dashboard-page.css / dashboard-preferences.css / dashboard-journey.css  # Dashboard — linked from dashboard.html, NOT in styles.css
@@ -187,6 +189,7 @@ japaconnect/
 │   ├── pathway-compare-data.js / -constants.js / -render.js / pathway-compare.js  # Compare Destinations (data layer DO NOT MODIFY)
 │   ├── worthit.js            # Migration Worth It (imports ROLES from paycalc-data.js, API_URL from config.js)
 │   ├── universities.js / scholarships.js / opportunities.js / opp-teaser.js  # Discovery content modules
+│   ├── newsfeed.js          # News Feed (/news) — fetches /api/news; createElement-only render (third-party RSS); timeAgo() relative-time helper; destination/visa/community filters + load-more + history.pushState
 │   ├── newsletter.js        # subscribeToDigest() + waitlistDigestHook()
 │   ├── analytics.js         # PostHog funnel instrumentation (EU instance); non-module IIFE; window.oraboTrack exposed
 │   ├── sources.js / sources-paycalc.js / sources-costliving.js / sources-visatracker.js / sources-modal.js  # Source citations (window.OraboSources)
