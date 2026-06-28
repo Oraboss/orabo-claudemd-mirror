@@ -88,7 +88,7 @@ Live product surface:
 | `pathway-compare.html` | Compare Destinations — free; navbar + footer; no auth, no backend | No |
 | `migration-worth-it.html` | Migration Worth It — free, public, SEO-indexed; no auth/payment | No |
 | `admin.html` | Admin panel — not linked publicly; direct URL only; loads `css/admin.css` + `js/admin.js` | Admin (Bearer JWT + `user_profiles.role='admin'`) |
-| `blog/index.html` + 6 articles | Blog | No |
+| `blog/index.html` + 10 articles | Blog | No |
 
 `index.html` is always logged-out — no auth in navbar. Standalone tool pages (`cv-tool.html`, `sop-tool.html`, `consult-booking.html`) have no navbar/footer and require no auth — they auto-open the tool modal via an external boot script. Name and email captured as the first form section. `compare-cities.html` / `all-countries-pay.html` gate via `localStorage.getItem('orabo_pro_status') === 'true'`; hide header with `?embed=true`. `doc-checklist.html`, `readiness-report.html`, `full-doc-checklist.html`, `timeline-tool.html` are standalone embedded pages — import tool module + `autoopen-*.js`; Stripe redirects use `window.top.location.href`. `timeline-tool.html` has no Stripe; its `autoopen-timeline.js` loads as `type=module` (same as `autoopen-checklist.js`) for correct deferred-execution sequencing after `timeline.js`.
 
@@ -203,7 +203,7 @@ japaconnect/
 │   ├── config.js            # API_URL export
 │   └── utils.js             # escapeHTML and shared helpers
 ├── pathway-compare.html / readiness-score.html / visa-eligibility.html / document-checklist.html / eb-immigration.html / migration-timeline.html
-├── blog/  (index.html + 6 articles; load ../styles.css)
+├── blog/  (index.html + 10 articles; load ../styles.css)
 └── CLAUDE.md
 ```
 
