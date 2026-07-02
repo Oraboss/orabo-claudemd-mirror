@@ -257,6 +257,16 @@ japaconnect-backend/
 └── .github/workflows/weekly-digest.yml  # GitHub Actions cron — Saturday 08:00 UTC + workflow_dispatch
 ```
 
+### Autonomous Marketing Engine — Phase 0
+
+Backend (`japaconnect-backend`):
+- `routes/admin-automation.js` — mounted at `/api/admin-automation`, `requireAdmin` JWT-gated (replicated self-contained middleware; does NOT import from `routes/admin.js`), read-mostly over `automation_runs` + `automation_alerts`. Endpoints: `GET /health`, `GET /runs`, `GET /alerts`, `POST /alerts/:id/ack`, `POST /test-run`.
+- `utils/automation-runner.js` + `utils/automation-registry.js` — shared substrate every AME job calls. Log prefix `[ame:<jobKey>]`. Registry weights locked (`seo_generate` 90 → `test_ping` 10); new jobs register in `JOB_REGISTRY`.
+- OPS tables `automation_runs`, `automation_alerts` — service-role writes only, RLS zero-policy deny-all. `seo_page_ledger` deferred to P1 (CONTENT DB).
+
+Frontend (`japaconnect`):
+- `admin.html` Automation tab (`data-tab="automation"`) + `js/admin-automation.js` — non-module IIFE, replicates `readSessionFromStorage()` + Bearer flow verbatim, own `data-tab` click listener (does NOT touch `admin.js`). `css/admin.css` appended with `.ame-*` classes reusing existing `--navy`/`--accent`/`--gold` vars.
+
 ---
 
 ## Feature Data Inventory
