@@ -281,6 +281,8 @@ Frontend (`japaconnect`):
 - `.github/workflows/ame-pseo.yml` — nightly 03:00 UTC + `workflow_dispatch` (`limit`/`archetypes`/`dry_run`/`inject_lint_canary`); generate → conditional commit (bot identity, `git diff --staged --quiet` gate, same-repo `GITHUB_TOKEN` push) → `curl` `/api/ame-ingest` with the `AME_INGEST_TOKEN` secret. `AME_BACKEND_URL` repo var overrides the Railway origin.
 - Template models `guides/eb-2-niw-cost.html`: single JSON-LD `@graph` [Article, FAQPage, BreadcrumbList] with `image`; `guide-table` + `data-label` on every `<td>`; `guide-faq` answers byte-synced to `acceptedAnswer.text`; `.lp-nav`/`.lp-footer` + Cookie Settings; loads `analytics.js` + `cookie-banner.js`; zero new CSS files. Tests: `tests/pseo-lint.test.mjs`, `tests/pseo-slug.test.mjs`.
 
+**Admin Automation tab — Trigger column caveat.** The `Trigger` column reads `event` for every `seo_generate` run regardless of true source, because `routes/ame-ingest.js` hardcodes the trigger argument. It cannot distinguish a scheduled cron run from a manual `workflow_dispatch`. To tell them apart during a smoke or gate check, read GitHub Actions' own `event` field (`schedule` vs `workflow_dispatch`) on the run, not the admin table. A failed scheduled run whose ingest 401s writes no `automation_runs` row at all (the row is written inside `/api/ame-ingest`), so an absent row is not proof the cron did not fire.
+
 ---
 
 ## Feature Data Inventory
